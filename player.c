@@ -8,9 +8,9 @@ Player::Player(int x, int y) : Sprite(x, y){
     this->width  = DIM;
     this->height = DIM;
 
-    this->grav   = true;
-    this->fall   = false;
-    this->bounce = false;
+    this->gravitation = true;
+    this->falling  = false;
+    this->bouncing = false;
 };
 
 void Player::move(){

@@ -68,10 +68,12 @@ class Sprite{
     public:
         int width;
         int height;
+        int frame;
         double x;
         double y;
-        int frame;
-        bool gravitate;
+        bool gravitation;
+        bool falling;
+        bool bouncing;
         // int row;
         // int col;
         // int bit;
@@ -88,19 +90,19 @@ class Sprite{
         void animate();
         void update();
         void move();
-        virtual void render();
+        void render();
 };
 
 class Player: public Sprite{
     public:
         int width;
         int height;
+        int frame;
         double x;
         double y;
-        int frame;
-        bool grav;
-        bool fall;
-        bool bounce;
+        bool gravitation;
+        bool falling;
+        bool bouncing;
 
         Player(int x, int y);
         void move();
@@ -111,34 +113,36 @@ class Enemy: public Sprite{
 
 };
 
+class Gravity{
+    // private:
+    public:
+        float gravity;
+        float buoyancy;
+        float lift;
+        float speed;
+        float delay;
+        Sprite* sprite;
+
+        Gravity(float factor,  int delay);
+        void bind(Player sprite);
+        void bind(Sprite sprite);
+        void update();
+        void reset();
+};
+
 class Physics{
     public:
-        class Gravity{
-            // private:
-            public:
-                float gravity;
-                float buoyancy;
-                float lift;
-                float speed;
-                float delay;
-                // vector<Sprite*> sprites;
-                // template<typename T>
-                vector<Player*> sprites;
-
-                Gravity(float factor,  int delay);
-                // void bind(Sprite* sprite);
-                void bind(Player* sprite);
-                void update();
-                void reset();
-        } gravity;
-
         class Collision{
             public:
                 void check();
         } collision;
 
+        vector<Gravity> dropable;
+
         Physics();
+        Gravity* gravity(float factor,  int delay);
         void bounce();
+        void update();
 };
 
 
@@ -167,6 +171,7 @@ SDL_Color hex2sdl(std::string input) {
 extern Game* game;
 extern Physics* physics;
 extern Player* player;
+extern Sprite* _sprite;
 extern Enemy* enemy;
 extern Stage stage;
 

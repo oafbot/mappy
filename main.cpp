@@ -27,6 +27,7 @@ SDL_Event event;
 Player* player;
 Game* game;
 Physics* physics;
+Sprite* _sprite;
 Stage stage;
 
 // char palette[10][8] = {"NULL", "#000000", "#BCBCBC", "#FCFCFC", "#0078F8", "#F8A4C0", "#AC7C00", "#F8B800", "#FCA044", "#0058F8"};
@@ -94,7 +95,7 @@ void input(){
 
 void update(){
     player->move();
-    physics->gravity.update();
+    physics->update();
 }
 
 void render(){
