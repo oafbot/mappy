@@ -1,7 +1,7 @@
 #include "game.hpp"
 using namespace std;
 
-Sprite::Sprite(int x, int y){
+Sprite::Sprite(){
     this->x = x-this->width/2;
     this->y = y-this->height/2;
 
@@ -36,10 +36,10 @@ void Sprite::render(){
         return;
     }
 
-    if(key_down){
+    if(game.controls.key_down){
         if( current_frame >= FRAME_COUNT ) {
-            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-            SDL_RenderClear( renderer );
+            // SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+            // SDL_RenderClear( renderer );
             current_frame = 0;
         }
         else{
@@ -51,8 +51,8 @@ void Sprite::render(){
 
     last_time = current_time;
 
-    for(int i=0; i < bitmap[0].size(); i++) {
-        bit = current_frame%2 ? bitmap[1][i] : bitmap[0][i];
+    for(int i=0; i < sprites[0].size(); i++) {
+        bit = current_frame%2 ? sprites[1][i] : sprites[0][i];
 
         alpha = palette[bit]=="NULL" ? 0 : 255;
         color = palette[bit]=="NULL" ? "#000000" : palette[bit];

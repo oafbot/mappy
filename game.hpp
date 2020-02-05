@@ -1,9 +1,10 @@
 #ifndef __GAME_H__
 #define __GAME_H__
 
+#include <iostream>
+// #include <cstdlib>
 #include <SDL2/SDL.h>
-// #include <SDL2/SDL_image.h>
-// #include <iostream>
+// #include <SDL.h>
 #include <emscripten.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -11,14 +12,27 @@
 #include <math.h>
 #include <string>
 #include <vector>
-// #include <cstdlib>
 #include <array>
+#include <map>
+#include <algorithm>
+#include <iterator>
 using namespace std;
 
 #define FRAME_COUNT 7
 #define SCALE 2
 #define DIM 16
-#define SPEED 1
+#define SPEED 2
+#define BYTE 8
+#define WORD 16
+#define LONG 32
+#define FRAMES 8
+#define SPRITE_SIZE 256
+#define BITMAP_SIZE 32
+#define TILE_SIZE 64
+#define LEVEL_WIDTH 56
+#define LEVEL_HEIGHT 36
+#define LEVEL_SIZE 512 //2016 //56*36
+// #define SQUAREx16 256
 
 extern Uint32 last_time;
 extern Uint32 last_frame_time;
@@ -31,36 +45,42 @@ extern SDL_Renderer *renderer;
 extern SDL_Rect background;
 extern SDL_Event event;
 
-extern bool left_key_down;
-extern bool right_key_down;
-extern bool up_key_down;
-extern bool down_key_down;
-extern bool space_key_down;
-extern bool key_down;
-
 extern double delta_time;
-extern int diff_time;
+extern int    diff_time;
 
 extern array <string, 56> palette;
-extern array <array<int, 256>, 2> bitmap;
-
-
-struct Stage{
-    int left;
-    int right;
-    int top;
-    int bottom;
-    int width;
-    int height;
-};
+extern array <array<int, SPRITE_SIZE>, BITMAP_SIZE> sprites;
+extern array <array<int, SPRITE_SIZE>, BITMAP_SIZE> b;
+extern array <array<int, TILE_SIZE>,   BITMAP_SIZE> tiles;
+extern array <array<int, LEVEL_SIZE>, 16> levels;
 
 struct Center{
     int x;
     int y;
 };
 
-class Control{
+class Stage{
+    public:
+        int left;
+        int right;
+        int top;
+        int bottom;
+        int width;
+        int height;
 
+        Stage(int w, int h);
+};
+
+class Control{
+    public:
+        bool left_key_down;
+        bool right_key_down;
+        bool up_key_down;
+        bool down_key_down;
+        bool key_down;
+
+        void input();
+        void keysup();
 };
 
 class Sprite{
@@ -74,17 +94,14 @@ class Sprite{
         bool gravitation;
         bool falling;
         bool bouncing;
-        // int row;
-        // int col;
-        // int bit;
-        // int alpha;
-        // string color;
-        // SDL_Rect r;
+        string direction;
+        string state;
+
         array< array<int, 256>, 2> data;
         array< array<int, 256>, 2> frames;
 
     public:
-        Sprite(int x, int y);
+        Sprite();
         void draw();
         void flip();
         void animate();
@@ -103,10 +120,21 @@ class Player: public Sprite{
         bool gravitation;
         bool falling;
         bool bouncing;
+        string direction;
+        string state;
+        map< string, array<array<int, SPRITE_SIZE>, FRAMES> > states;
 
-        Player(int x, int y);
+        array< array<int, SPRITE_SIZE>, BITMAP_SIZE> data;
+        array< array<int, 2>, 2> frames;
+
+        Player();
+        void init(double x, double y);
         void move();
+        void update();
         void render();
+        void draw(const array<array<int, SPRITE_SIZE>, FRAMES> &data);
+        void define(string name, array<array<int, SPRITE_SIZE>, FRAMES> frames);
+        array<array<int, SPRITE_SIZE>, FRAMES> flip(array<array<int, SPRITE_SIZE>, FRAMES> frames);
 };
 
 class Enemy: public Sprite{
@@ -121,11 +149,12 @@ class Gravity{
         float lift;
         float speed;
         float delay;
-        Sprite* sprite;
+        Player* player;
+        Enemy* enemy;
 
         Gravity(float factor,  int delay);
-        void bind(Player sprite);
-        void bind(Sprite sprite);
+        void bind(Player* player);
+        void bind(Enemy enemy);
         void update();
         void reset();
 };
@@ -140,17 +169,36 @@ class Physics{
         vector<Gravity> dropable;
 
         Physics();
-        Gravity* gravity(float factor,  int delay);
+        Gravity gravity(float factor,  int delay);
         void bounce();
         void update();
 };
 
+class Mapper{
+    public:
+        double x;
+        double y;
+        array<SDL_Texture*, 16> background;
+
+        Mapper();
+        void init();
+        void compile(int level);
+        void render();
+        void draw(const array<int, TILE_SIZE> &data);
+};
 
 class Game{
     public:
         bool PAUSED;
+        int  level;
+        Control controls;
+        Stage stage;
+        Mapper mapper;
+
         Game();
-        void init();
+        void init(int w, int h);
+        void update();
+        void render();
 };
 
 SDL_Color hex2sdl(std::string input) {
@@ -168,11 +216,10 @@ SDL_Color hex2sdl(std::string input) {
     return color;
 }
 
-extern Game* game;
-extern Physics* physics;
-extern Player* player;
-extern Sprite* _sprite;
-extern Enemy* enemy;
-extern Stage stage;
+extern Game    game;
+extern Physics physics;
+extern Player  player;
+extern Enemy   enemy;
+// extern Tile    tile;
 
 #endif
