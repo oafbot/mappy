@@ -25,14 +25,17 @@ using namespace std;
 #define BYTE 8
 #define WORD 16
 #define LONG 32
+#define UP 0
+#define RIGHT 1
+#define DOWN 2
+#define LEFT 3
 #define FRAMES 8
 #define SPRITE_SIZE 256
 #define BITMAP_SIZE 32
 #define TILE_SIZE 64
 #define LEVEL_WIDTH 56
 #define LEVEL_HEIGHT 36
-#define LEVEL_SIZE 512 //2016 //56*36
-// #define SQUAREx16 256
+#define LEVEL_SIZE LEVEL_WIDTH*LEVEL_HEIGHT //2016
 
 extern Uint32 last_time;
 extern Uint32 last_frame_time;
@@ -53,11 +56,12 @@ extern array <array<int, SPRITE_SIZE>, BITMAP_SIZE> sprites;
 extern array <array<int, SPRITE_SIZE>, BITMAP_SIZE> b;
 extern array <array<int, TILE_SIZE>,   BITMAP_SIZE> tiles;
 extern array <array<int, LEVEL_SIZE>, 16> levels;
+extern array <array<int, LEVEL_SIZE>, 16> objects;
 
-struct Center{
-    int x;
-    int y;
-};
+// struct Center{
+//     int x;
+//     int y;
+// };
 
 class Stage{
     public:
@@ -134,7 +138,14 @@ class Player: public Sprite{
         void render();
         void draw(const array<array<int, SPRITE_SIZE>, FRAMES> &data);
         void define(string name, array<array<int, SPRITE_SIZE>, FRAMES> frames);
+        int index(double x, double y);
+        int adjacent(int direction);
+        int adjacent(int direction, double x, double y);
+        bool traverse(int direction);
+        bool traverse(int direction, double x, double y);
         array<array<int, SPRITE_SIZE>, FRAMES> flip(array<array<int, SPRITE_SIZE>, FRAMES> frames);
+        array<double, 2> position();
+        void align();
 };
 
 class Enemy: public Sprite{
@@ -149,6 +160,8 @@ class Gravity{
         float lift;
         float speed;
         float delay;
+        float min;
+        float max;
         Player* player;
         Enemy* enemy;
 
@@ -157,6 +170,7 @@ class Gravity{
         void bind(Enemy enemy);
         void update();
         void reset();
+        void bound();
 };
 
 class Physics{
@@ -187,19 +201,46 @@ class Mapper{
         void draw(const array<int, TILE_SIZE> &data);
 };
 
+// class Timer {
+//     bool clear = false;
+
+//     public:
+//         template<typename Function>
+//         void setTimeout(Function function, int delay);
+
+//         template<typename Function>
+//         void setInterval(Function function, int interval);
+
+//         void stop();
+// };
+
 class Game{
     public:
         bool PAUSED;
+        bool scrolling;
         int  level;
+        struct Center{
+            double x;
+            double y;
+        } center;
+        struct Offset{
+            double x;
+            double y;
+        } offset;
+
         Control controls;
         Stage stage;
         Mapper mapper;
+        // Timer timer;
 
         Game();
         void init(int w, int h);
         void update();
         void render();
+        bool delay();
 };
+
+
 
 SDL_Color hex2sdl(std::string input) {
     if (input[0] == '#')
@@ -220,6 +261,7 @@ extern Game    game;
 extern Physics physics;
 extern Player  player;
 extern Enemy   enemy;
+// extern Timer   timer;
 // extern Tile    tile;
 
 #endif

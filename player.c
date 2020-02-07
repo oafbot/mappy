@@ -18,29 +18,120 @@ void Player::init(double x, double y){
     this->data = sprites;
 }
 
+// void Player::stopBounce(){
+//     bouncing = false;
+// };
+
 void Player::move(){
     if( game.controls.left_key_down ) {
-        if(this->x>game.stage.left){
-            this->x -= SPEED;
-        }
-        else{
-            this->x = game.stage.left;
+        if(traverse(LEFT)){
+            if(this->x>game.stage.left){
+                if(!game.scrolling){
+                    this->x -= SPEED;
+                }
+                else{
+                    game.offset.x += SPEED;
+                }
+            }
+            else{
+                this->x = game.stage.left;
+            }
+            if(bouncing){
+                if(game.delay()){
+                    return;
+                };
+                state = "hop-left";
+                bouncing = false;
+            }
         }
     }
 
     if( game.controls.right_key_down ) {
-        if(this->x<game.stage.right-this->width*2){
-            this->x += SPEED;
-        }
-        else{
-            this->x = game.stage.right-this->width*2;
+        if(traverse(RIGHT)){
+            if(this->x<game.stage.right-this->width*2){
+                if(!game.scrolling){
+                    this->x += SPEED;
+                }
+                else{
+                    game.offset.x -= SPEED;
+                }
+            }
+            else{
+                this->x = game.stage.right-this->width*2;
+            }
+            if(bouncing){
+                if(game.delay()){
+                    return;
+                };
+                state = "hop-right";
+                bouncing = false;
+            }
         }
     }
 }
 
-// void Player::position(double x, double:y){
+bool Player::traverse(int direction){
+    int tile = adjacent(direction, NULL, NULL);
+    if(tile==0){
+        return true;
+    }
+    return false;
+}
 
-// }
+bool Player::traverse(int direction, double x, double y){
+    int tile = adjacent(direction, x, y);
+    if(tile==0){
+        return true;
+    }
+    return false;
+}
+
+array<double, 2> Player::position(){
+    array<double, 2> coord;
+    return coord;
+}
+
+int Player::index(double x, double y){
+    int tile = BYTE*SCALE;
+    double diff = game.stage.width-(LEVEL_WIDTH*tile);
+    double xpos;
+    xpos = x + (width/2)*SCALE - game.offset.x;
+
+    int col = (int)floor(xpos/tile);
+    int row = (int)floor((y+height-game.offset.y)/tile);
+    return col + row*LEVEL_WIDTH;
+}
+
+int Player::adjacent(int direction, double _x, double _y){
+    int a, shift;
+    _x = _x==NULL ? x+(width/2)*SCALE - game.offset.x : _x;
+    _y = _y==NULL ? y+(height/2)*SCALE - game.offset.y: _y;
+
+    int i = index(x, y);
+    shift = LEVEL_WIDTH;
+
+    switch(direction){
+        case UP:
+            a = objects[game.level-1][i-shift];
+            break;
+        case DOWN:
+            a = objects[game.level-1][i+shift];
+            break;
+        case RIGHT:
+            a = objects[game.level-1][i+1];
+            break;
+        case LEFT:
+            a = objects[game.level-1][i-1];
+            break;
+    }
+    return a;
+}
+
+void Player::align(){
+    if(((int)y)%LONG!=0){
+        y = (int)(floor(y)/LONG)*LONG;
+    }
+}
 
 void Player::draw(const array<array<int, SPRITE_SIZE>, FRAMES> &data){
     string color;
@@ -111,37 +202,28 @@ void Player::define(string name, array<array<int, SPRITE_SIZE>, FRAMES> frames){
 }
 
 void Player::update(){
-    if(this->falling){
+    if(this->falling && !game.controls.key_down){
         this->state = "drop";
+    }
+    else if(this->bouncing && !game.controls.key_down){
+        this->state = "bound";
     }
     else{
         this->state = this->direction;
     }
+
+    if(game.scrolling && (game.offset.x>=64 || game.offset.x<=-128)){
+        game.scrolling = false;
+    }
+    else if(x>game.center.x-64 && x+width<game.center.x+64){
+         game.scrolling = true;
+    }
+
 }
 
 void Player::render(){
-    // int ms;
-
-    // current_time = SDL_GetTicks();
-    // ms = current_time - last_time;
-
-    // if( ms < ms_per_frame ){
-    //     return;
-    // }
-
-    // if(this->falling){
-    //     this->x = (this->x<0) ? 0 : this->x;
-    //     this->x = (this->x>game.stage.right-DIM) ? game.stage.right-DIM*4 : this->x;
-    //     this->y = (this->y<0) ? 0 : this->y;
-        
-    // }else{
-
-    // }
-
     if(game.controls.key_down){
         if( current_frame >= FRAME_COUNT ) {
-            // SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-            // SDL_RenderClear( renderer );
             current_frame = 0;
         }
         else{
@@ -151,6 +233,4 @@ void Player::render(){
     // printf("%s\n", this->state.c_str());
     this->draw(this->states[this->state]);
     this->frame = current_frame;
-
-    // last_time = current_time;
 }

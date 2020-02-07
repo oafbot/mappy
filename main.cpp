@@ -38,7 +38,8 @@ void init(){
     player.define("right", player.flip(f0));
     player.define("drop", f1);
     player.define("bound", f2);
-    player.define("hop", f3);
+    player.define("hop-left", f3);
+    player.define("hop-right", player.flip(f3));
     player.define("spin", f5);
     player.define("dead", f6);
 }

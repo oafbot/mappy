@@ -58,8 +58,8 @@ void Sprite::render(){
         color = palette[bit]=="NULL" ? "#000000" : palette[bit];
         SDL_Color c = hex2sdl(color);
 
-        col = i % 16;
-        row = floor(i / 16);
+        col = i % DIM;
+        row = floor(i / DIM);
 
         r.x = this->x + w*col;
         r.y = this->y + w*row;

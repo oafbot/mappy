@@ -19,7 +19,7 @@ Uint32 current_time;
 SDL_Window *window;
 SDL_Renderer *renderer;
 
-SDL_Rect dest = {.x = 160, .y = 100, .w = 16, .h = 16 };
+SDL_Rect dest = {.x = 160, .y = 100, .w = DIM, .h = DIM };
 
 SDL_Texture *sprite_texture;
 
@@ -107,18 +107,18 @@ void move() {
     player_x += player_vx;
 
     if( player_x > 320 ) {
-        player_x = -16;
+        player_x = -DIM;
     }
-    else if( player_x < -16 ) {
+    else if( player_x < -DIM ) {
         player_x = 320;
     }
 
     player_y += player_vy;
 
     if( player_y > 200 ) {
-        player_y = -16;
+        player_y = -DIM;
     }
-    else if( player_y < -16 ) {
+    else if( player_y < -DIM ) {
         player_y = 200;
     }
 
@@ -164,7 +164,6 @@ void input() {
                         break;
                 }
                 break;
-            
             default:
                 break;
         }

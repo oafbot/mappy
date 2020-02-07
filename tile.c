@@ -4,7 +4,7 @@ Mapper::Mapper(){
 }
 
 void Mapper::init(){
-    setStatus("Compiling levels...\n");
+    // setStatus("Compiling levels...\n");
     for(int i=0; i<levels.size(); i++){
         this->compile(i);
     };
@@ -15,6 +15,7 @@ void Mapper::compile(int level){
     int row;
     SDL_Texture *texture;
 
+    // printf("Loading stage %d\n", level+1);
     // printf("%s\n", this->state.c_str());
 
     texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET,
@@ -23,11 +24,11 @@ void Mapper::compile(int level){
 
     for(int i=0; i<LEVEL_SIZE; i++){
         if(i){
-            col = i % 56;
-            row = floor(i / 56);
+            col = i % LEVEL_WIDTH;
+            row = floor(i / LEVEL_WIDTH);
 
-            this->x = col*8*SCALE;
-            this->y = row*8*SCALE;
+            this->x = col*BYTE*SCALE;
+            this->y = row*BYTE*SCALE;
             this->draw(tiles[levels[level-1][i]]);
         }
     }
@@ -37,7 +38,18 @@ void Mapper::compile(int level){
 }
 
 void Mapper::render(){
-    SDL_RenderCopy(renderer, this->background[game.level-1], NULL, NULL);
+    SDL_Rect dest, src;
+    dest.x = game.offset.x;
+    dest.y = 0;
+    dest.w = LEVEL_WIDTH*BYTE*SCALE;  //game.stage.width;
+    dest.h = LEVEL_HEIGHT*BYTE*SCALE; //game.stage.height;
+
+    src.x = 0;
+    src.y = 0;
+    src.w = LEVEL_WIDTH*BYTE*SCALE;
+    src.h = LEVEL_HEIGHT*BYTE*SCALE;
+
+    SDL_RenderCopy(renderer, background[game.level-1], &src, &dest);
 }
 
 void Mapper::draw(const array<int, TILE_SIZE> &data){
@@ -56,8 +68,8 @@ void Mapper::draw(const array<int, TILE_SIZE> &data){
             color = palette[bit];
             SDL_Color c = hex2sdl(color);
 
-            col = i % 8;
-            row = floor(i / 8);
+            col = i % BYTE;
+            row = floor(i / BYTE);
 
             r.x = this->x + w*col;
             r.y = this->y + w*row;
