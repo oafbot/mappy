@@ -1,34 +1,6 @@
 #include "game.hpp"
 using namespace std;
 
-// void Timer::setInterval(auto function, int interval) {
-//     this->clear = false;
-//     std::thread t([=]() {
-//         while(true) {
-//             if(this->clear) return;
-//             std::this_thread::sleep_for(std::chrono::milliseconds(interval));
-//             if(this->clear) return;
-//             function();
-//         }
-//     });
-//     t.detach();
-// }
-
-// void Timer::setTimeout(auto function, int delay) {
-//     this->clear = false;
-//     std::thread t([=]() {
-//         if(this->clear) return;
-//         std::this_thread::sleep_for(std::chrono::milliseconds(delay));
-//         if(this->clear) return;
-//         function();
-//     });
-//     t.detach();
-// }
-
-// void Timer::stop() {
-//     this->clear = true;
-// }
-
 Stage::Stage(int w, int h){
     this->left   = 0;
     this->right  = w;
@@ -36,7 +8,6 @@ Stage::Stage(int w, int h){
     this->bottom = h;
     this->width  = w;
     this->height = h;
-
 }
 
 Game::Game() : stage(0,0){
@@ -45,9 +16,10 @@ Game::Game() : stage(0,0){
     this->controls = * new Control();
     this->mapper   = * new Mapper();
     // this->timer    =   Timer();
-    this->offset.x = 0;
+    this->offset.x = -182;
     this->offset.y = 0;
     this->scrolling = true;
+    this->controls.lock = false;
 }
 
 void Game::update(){
@@ -68,21 +40,51 @@ bool Game::delay(){
     return false;
 }
 
+void Game::renderObjects(){
+    for(int i=0; i<objects["trampoline"].size(); i++){
+        if(objects["trampoline"][i].assigned){
+            objects["trampoline"][i].render();
+            // cout << objects["trampoline"][i]->frame << "\n";
+            // cout << objects["trampoline"][i]->state << "\n";
+        }
+    }
+}
+
 void Game::render(){
     if(delay()){
         return;
     };
 
     mapper.render();
+    // objects.render();
+    renderObjects();
     player.render();
 
     last_time = current_time;
+}
+
+void Game::setup(){
+    for(int i=0; i<LEVEL_SIZE; i++) {
+        int key = data.interactive[level-1][i];
+        if(key==2){
+            for(int t=0; t<objects["trampoline"].size(); t++){
+                if(!objects["trampoline"][t].assigned){
+                    objects["trampoline"][t].assigned = true;
+                    objects["trampoline"][t].assign(i);
+                    break;
+                }
+            }
+            i = i + 2;
+        }
+    }
 }
 
 void Game::init(int w, int h){
     this->stage = * new Stage(w, h);
     this->center.x = this->stage.width/2;
     this->center.y = this->stage.height/2;
+
+    this->stage.bottom -= DIM*SCALE;
 
     physics = * new Physics();
     Gravity g = physics.gravity(0.125, 0);/*0.125*/
@@ -96,4 +98,19 @@ void Game::init(int w, int h){
     SDL_RenderClear( renderer );
     // SDL_RenderPresent(renderer);
     this->mapper.init();
+
+    for(int i=0; i<BYTE; i++){
+        Trampoline trampoline = Trampoline();
+        trampoline.compile();
+        objects["trampoline"].push_back(trampoline);
+    }
+}
+
+int Game::trampoline(){
+    for(int t=0; t<objects["trampoline"].size(); t++){
+        if(objects["trampoline"][t].active){
+            return t;
+        }
+    }
+    return -1;
 }

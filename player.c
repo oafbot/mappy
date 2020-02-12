@@ -10,12 +10,14 @@ Player::Player() : Sprite(){
     this->bouncing = false;
     this->direction = "left";
     this->state = "left";
+    this->frame = 0;
+    this->dead = false;
 };
 
 void Player::init(double x, double y){
     this->x = x-this->width/2;
     this->y = y-this->height/2;
-    this->data = sprites;
+    // this->data = data.sprites;
 }
 
 // void Player::stopBounce(){
@@ -37,12 +39,15 @@ void Player::move(){
                 this->x = game.stage.left;
             }
             if(bouncing){
+                // state = "hop-left";
                 if(game.delay()){
                     return;
                 };
-                state = "hop-left";
                 bouncing = false;
             }
+            // else if(falling){
+            //     state = "hop-left";
+            // }
         }
     }
 
@@ -60,12 +65,15 @@ void Player::move(){
                 this->x = game.stage.right-this->width*2;
             }
             if(bouncing){
+                // state = "hop-right";
                 if(game.delay()){
                     return;
                 };
-                state = "hop-right";
                 bouncing = false;
             }
+            // else if(falling){
+            //     state = "hop-right";
+            // }
         }
     }
 }
@@ -92,6 +100,8 @@ array<double, 2> Player::position(){
 }
 
 int Player::index(double x, double y){
+    // printf("%f %f\n", x, y);
+    // printf("%f\n", game.offset.x);
     int tile = BYTE*SCALE;
     double diff = game.stage.width-(LEVEL_WIDTH*tile);
     double xpos;
@@ -112,16 +122,16 @@ int Player::adjacent(int direction, double _x, double _y){
 
     switch(direction){
         case UP:
-            a = objects[game.level-1][i-shift];
+            a = data.interactive[game.level-1][i-shift];
             break;
         case DOWN:
-            a = objects[game.level-1][i+shift];
+            a = data.interactive[game.level-1][i+shift];
             break;
         case RIGHT:
-            a = objects[game.level-1][i+1];
+            a = data.interactive[game.level-1][i+1];
             break;
         case LEFT:
-            a = objects[game.level-1][i-1];
+            a = data.interactive[game.level-1][i-1];
             break;
     }
     return a;
@@ -133,7 +143,7 @@ void Player::align(){
     }
 }
 
-void Player::draw(const array<array<int, SPRITE_SIZE>, FRAMES> &data){
+void Player::draw(const array<array<int, SPRITE_SIZE>, FRAMES> &bits){
     string color;
     SDL_Rect r;
 
@@ -143,11 +153,11 @@ void Player::draw(const array<array<int, SPRITE_SIZE>, FRAMES> &data){
     int bit;
     int alpha;
 
-    for(int i=0; i < data[0].size(); i++) {
-        bit = data[current_frame][i];
+    for(int i=0; i < bits[0].size(); i++) {
+        bit = bits[frame][i];
         if(bit){
-            alpha = palette[bit]=="NULL" ? 0 : 255;
-            color = palette[bit]=="NULL" ? "#000000" : palette[bit];
+            alpha = data.palette[bit]=="NULL" ? 0 : 255;
+            color = data.palette[bit]=="NULL" ? "#000000" : data.palette[bit];
             SDL_Color c = hex2sdl(color);
 
             col = i % DIM;
@@ -197,20 +207,29 @@ array<array<int, SPRITE_SIZE>, FRAMES> Player::flip(array<array<int, SPRITE_SIZE
 
 void Player::define(string name, array<array<int, SPRITE_SIZE>, FRAMES> frames){
     this->states.insert(make_pair(name.c_str(), frames));
-    // printf("%s\n", name.c_str());
-    // printf("%s\n", typeid(frames).name());
 }
 
 void Player::update(){
-    if(this->falling && !game.controls.key_down){
-        this->state = "drop";
+    if(state!="dead" && state!="spin"){
+        if(this->falling && !game.controls.key_down){
+            this->state = "drop";
+        }
+        else if(this->bouncing && !game.controls.key_down){
+            this->state = "bound";
+        }
+        else{
+            if(this->falling || this->bouncing){
+                this->state = this->direction=="left" ? "hop-left" : "hop-right";
+            }
+            else{
+                this->state = this->direction;
+            }
+        }
     }
-    else if(this->bouncing && !game.controls.key_down){
-        this->state = "bound";
+    else if(state=="spin"){
+
     }
-    else{
-        this->state = this->direction;
-    }
+
 
     if(game.scrolling && (game.offset.x>=64 || game.offset.x<=-128)){
         game.scrolling = false;
@@ -218,19 +237,28 @@ void Player::update(){
     else if(x>game.center.x-64 && x+width<game.center.x+64){
          game.scrolling = true;
     }
-
 }
 
 void Player::render(){
-    if(game.controls.key_down){
-        if( current_frame >= FRAME_COUNT ) {
-            current_frame = 0;
+    if(game.controls.key_down || state=="spin" || state=="dead"){
+        if( frame >= FRAME_COUNT ) {
+            if(state=="spin"){
+                state = "dead";
+            }
+            else{
+                frame = 0;
+            }
         }
         else{
-            current_frame++;
+            frame++;
         }
     }
-    // printf("%s\n", this->state.c_str());
     this->draw(this->states[this->state]);
-    this->frame = current_frame;
+}
+
+void Player::deaded(){
+    state = "spin";
+    bouncing = false;
+    falling = false;
+    dead = true;
 }

@@ -5,7 +5,7 @@ Mapper::Mapper(){
 
 void Mapper::init(){
     // setStatus("Compiling levels...\n");
-    for(int i=0; i<levels.size(); i++){
+    for(int i=0; i<data.levels.size(); i++){
         this->compile(i);
     };
 }
@@ -29,7 +29,7 @@ void Mapper::compile(int level){
 
             this->x = col*BYTE*SCALE;
             this->y = row*BYTE*SCALE;
-            this->draw(tiles[levels[level-1][i]]);
+            this->draw(data.tiles[data.levels[level-1][i]]);
         }
     }
     this->background[level-1] = texture;
@@ -52,7 +52,7 @@ void Mapper::render(){
     SDL_RenderCopy(renderer, background[game.level-1], &src, &dest);
 }
 
-void Mapper::draw(const array<int, TILE_SIZE> &data){
+void Mapper::draw(const array<int, TILE_SIZE> &bits){
     string color;
     SDL_Rect r;
 
@@ -63,9 +63,9 @@ void Mapper::draw(const array<int, TILE_SIZE> &data){
     int alpha = 255;
 
     for(int i=0; i < TILE_SIZE; i++) {
-        bit = data[i];
+        bit = bits[i];
         if(bit){
-            color = palette[bit];
+            color = data.palette[bit];
             SDL_Color c = hex2sdl(color);
 
             col = i % BYTE;

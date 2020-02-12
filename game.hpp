@@ -1,7 +1,6 @@
 #ifndef __GAME_H__
 #define __GAME_H__
 
-#include <iostream>
 // #include <cstdlib>
 #include <SDL2/SDL.h>
 // #include <SDL.h>
@@ -16,6 +15,7 @@
 #include <map>
 #include <algorithm>
 #include <iterator>
+#include <iostream>
 using namespace std;
 
 #define FRAME_COUNT 7
@@ -30,8 +30,9 @@ using namespace std;
 #define DOWN 2
 #define LEFT 3
 #define FRAMES 8
+#define BOUNCES 3
 #define SPRITE_SIZE 256
-#define BITMAP_SIZE 32
+#define BITMAP_SIZE 64
 #define TILE_SIZE 64
 #define LEVEL_WIDTH 56
 #define LEVEL_HEIGHT 36
@@ -45,23 +46,25 @@ extern int current_frame;
 
 extern SDL_Window *window;
 extern SDL_Renderer *renderer;
-extern SDL_Rect background;
+// extern SDL_Rect background;
 extern SDL_Event event;
 
 extern double delta_time;
 extern int    diff_time;
 
-extern array <string, 56> palette;
-extern array <array<int, SPRITE_SIZE>, BITMAP_SIZE> sprites;
-extern array <array<int, SPRITE_SIZE>, BITMAP_SIZE> b;
-extern array <array<int, TILE_SIZE>,   BITMAP_SIZE> tiles;
-extern array <array<int, LEVEL_SIZE>, 16> levels;
-extern array <array<int, LEVEL_SIZE>, 16> objects;
+struct Data{
+    array <string, 56> palette;
+    array <array<int, SPRITE_SIZE>, BITMAP_SIZE> sprites;
+    array <array<int, TILE_SIZE>,   BITMAP_SIZE> objects;
+    array <array<int, TILE_SIZE>,   BITMAP_SIZE> tiles;
+    array <array<int, LEVEL_SIZE>, 16> levels;
+    array <array<int, LEVEL_SIZE>, 16> interactive;
+};
 
-// struct Center{
-//     int x;
-//     int y;
-// };
+struct Coordinates{
+    double x;
+    double y;
+};
 
 class Stage{
     public:
@@ -82,6 +85,7 @@ class Control{
         bool up_key_down;
         bool down_key_down;
         bool key_down;
+        bool lock;
 
         void input();
         void keysup();
@@ -101,7 +105,7 @@ class Sprite{
         string direction;
         string state;
 
-        array< array<int, 256>, 2> data;
+        // array< array<int, 256>, 2> data;
         array< array<int, 256>, 2> frames;
 
     public:
@@ -114,6 +118,57 @@ class Sprite{
         void render();
 };
 
+class GameObjects{
+
+};
+
+class GameObject{
+    public:
+        string state;
+        string type;
+        int width;
+        int height;
+        int frame;
+        int cycle;
+        int repeat;
+        double x;
+        double y;
+        bool animated;
+        bool loop;
+        bool assigned;
+        bool active;
+        vector<int> group;
+        vector< Coordinates > layout;
+        // map< string, array<array<int, TILE_SIZE>, FRAMES> > states;
+        map< string, vector< array<array<int, TILE_SIZE>, FRAMES> > >states;
+        map<string, array<SDL_Texture*, FRAMES> > cache;
+
+        GameObject();
+        void init();
+        void update();
+        void render();
+        void reset();
+        void compile();
+        void assign(int index);
+        void define(string name, vector< array<array<int, TILE_SIZE>, FRAMES> > frames);
+        void draw(const array<int, TILE_SIZE> &bits, Coordinates offset);
+        array<int, TILE_SIZE> flip(const array<int, TILE_SIZE> frames);
+};
+
+class Trampoline: public GameObject{
+    public:
+        int bounces;
+
+        Trampoline();
+        void init();
+        void assign(int index);
+        void reset();
+        void bounce();
+
+        vector< array<array<int, TILE_SIZE>, FRAMES> >
+        changeColor(vector< array<array<int, TILE_SIZE>, FRAMES> > grouped, int color);
+};
+
 class Player: public Sprite{
     public:
         int width;
@@ -124,11 +179,12 @@ class Player: public Sprite{
         bool gravitation;
         bool falling;
         bool bouncing;
+        bool dead;
         string direction;
         string state;
         map< string, array<array<int, SPRITE_SIZE>, FRAMES> > states;
 
-        array< array<int, SPRITE_SIZE>, BITMAP_SIZE> data;
+        // array< array<int, SPRITE_SIZE>, BITMAP_SIZE> data;
         array< array<int, 2>, 2> frames;
 
         Player();
@@ -146,6 +202,7 @@ class Player: public Sprite{
         array<array<int, SPRITE_SIZE>, FRAMES> flip(array<array<int, SPRITE_SIZE>, FRAMES> frames);
         array<double, 2> position();
         void align();
+        void deaded();
 };
 
 class Enemy: public Sprite{
@@ -171,6 +228,7 @@ class Gravity{
         void update();
         void reset();
         void bound();
+        bool fallthru();
 };
 
 class Physics{
@@ -201,19 +259,6 @@ class Mapper{
         void draw(const array<int, TILE_SIZE> &data);
 };
 
-// class Timer {
-//     bool clear = false;
-
-//     public:
-//         template<typename Function>
-//         void setTimeout(Function function, int delay);
-
-//         template<typename Function>
-//         void setInterval(Function function, int interval);
-
-//         void stop();
-// };
-
 class Game{
     public:
         bool PAUSED;
@@ -231,6 +276,8 @@ class Game{
         Control controls;
         Stage stage;
         Mapper mapper;
+        vector<Enemy> enemies;
+        map< string, vector<Trampoline> > objects;
         // Timer timer;
 
         Game();
@@ -238,6 +285,9 @@ class Game{
         void update();
         void render();
         bool delay();
+        void setup();
+        void renderObjects();
+        int trampoline();
 };
 
 
@@ -261,7 +311,7 @@ extern Game    game;
 extern Physics physics;
 extern Player  player;
 extern Enemy   enemy;
-// extern Timer   timer;
-// extern Tile    tile;
+extern struct Data data;
+// extern struct Coordinates;
 
 #endif

@@ -1,31 +1,51 @@
+#include "game.hpp"
+using namespace std;
+
 void Control::input(){
     if( SDL_PollEvent( &event ) ){
         switch( event.type ){
             case SDL_KEYDOWN:
                 switch( event.key.keysym.sym ){
                     case SDLK_LEFT:
-                        this->left_key_down = true;
-                        this->key_down = true;
-                        player.direction = "left";
-                        player.state = "left";
+                        if(!player.dead && !lock){
+                            this->left_key_down = true;
+                            this->key_down = true;
+                            player.direction = "left";
+                            if(!player.falling && !player.bouncing){
+                                player.state = "left";
+                            }else{
+                                player.state = "hop-left";
+                            }
+                        }
                         break;
                     case SDLK_RIGHT:
-                        this->right_key_down = true;
-                        this->key_down = true;
-                        player.direction = "right";
-                        player.state = "right";
+                        if(!player.dead && !lock){
+                            this->right_key_down = true;
+                            this->key_down = true;
+                            player.direction = "right";
+                            if(!player.falling && !player.bouncing){
+                                player.state = "right";
+                            }
+                            else{
+                                player.state = "hop-right";
+                            }
+                        }
                         break;
                     case SDLK_UP:
                         this->up_key_down = true;
                         this->key_down = true;
-                        player.direction = "up";
-                        player.state = "up";
+                        // player.direction = "up";
+                        // if(!player.falling && !player.bouncing){
+                        //     player.state = "up";
+                        // }
                         break;
                     case SDLK_DOWN:
                         this->down_key_down = true;
                         this->key_down = true;
-                        player.direction = "down";
-                        player.state = "down";
+                        // player.direction = "down";
+                        // if(!player.falling && !player.bouncing){
+                        //     player.state = "down";
+                        // }
                         break;
                     default:
                         // key_down = false;

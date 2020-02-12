@@ -1,11 +1,12 @@
 #include "game.hpp"
+#include "data.c"
 #include "sprite.c"
 #include "player.c"
 #include "physics.c"
 #include "control.c"
+#include "objects.c"
 #include "game.c"
 #include "tile.c"
-#include "data.c"
 #include <type_traits>
 #include <cstddef>
 
@@ -27,6 +28,7 @@ Player  player;
 Physics physics;
 
 void init(){
+    array <array<int, SPRITE_SIZE>, BITMAP_SIZE> b = data.sprites;
     array<array<int, SPRITE_SIZE>, FRAMES>
     f0 = {b[0], b[1], b[0], b[1], b[0], b[1], b[0], b[1]}, // left, right
     f1 = {b[2], b[2], b[3], b[3], b[2], b[2], b[3], b[3]}, // drop
@@ -42,6 +44,8 @@ void init(){
     player.define("hop-right", player.flip(f3));
     player.define("spin", f5);
     player.define("dead", f6);
+
+    game.setup();
 }
 
 void gameloop(){
@@ -55,7 +59,7 @@ int main(){
     game.init(800, 600);
 
     player = * new Player();
-    player.init(game.stage.width/2, game.stage.height/2);
+    player.init(580, 480);
     init();
 
     // last_frame_time = last_time = SDL_GetTicks();
