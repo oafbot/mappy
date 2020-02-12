@@ -120,12 +120,12 @@ void Gravity::update(){
                 return;
             }
 
-            int t = game.trampoline();
-            if(t>=0){
-                if(game.objects["trampoline"][t].active){
-                    game.objects["trampoline"][t].bounce();
-                }
-            }
+            // int t = game.trampoline();
+            // if(t>=0){
+            //     if(game.objects["trampoline"][t].active){
+            //         // game.objects["trampoline"][t].bounce();
+            //     }
+            // }
 
             player->y -= lift;
 

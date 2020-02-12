@@ -190,6 +190,38 @@ void Trampoline::assign(int index){
     init();
 }
 
+void Trampoline::render(){
+    SDL_Rect dest, src;
+    dest.x = game.offset.x + x;
+    dest.y = game.offset.y + y;
+    dest.w = width*SCALE;
+    dest.h = height*SCALE;
+
+    src.x = 0;
+    src.y = 0;
+    src.w = width*SCALE;
+    src.h = height*SCALE;
+
+    if(animated){
+        if( frame >= FRAME_COUNT ){
+            bounce();
+            if(loop==true || cycle<repeat){
+                frame = 0;
+                cycle++;
+            }
+            else{
+                reset();
+            }
+        }
+        else{
+            frame++;
+        }
+    }
+
+    SDL_RenderCopy(renderer, cache[state][frame], &src, &dest);
+}
+
+
 vector< array<array<int, TILE_SIZE>, FRAMES> >
 Trampoline::changeColor(vector< array<array<int, TILE_SIZE>, FRAMES> > grouped, int color){
     vector< array<array<int, TILE_SIZE>, FRAMES> > replace;

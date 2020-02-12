@@ -163,6 +163,7 @@ class Trampoline: public GameObject{
         void init();
         void assign(int index);
         void reset();
+        void render();
         void bounce();
 
         vector< array<array<int, TILE_SIZE>, FRAMES> >
