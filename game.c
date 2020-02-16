@@ -104,8 +104,9 @@ void Game::init(int w, int h){
     this->stage.bottom -= DIM*SCALE;
 
     physics = * new Physics();
-    Gravity<Player> g = physics.gravity(&player, 0.125, 0);
-    physics.gravitation.player = &g;
+    player.gravity = physics.gravity(0.125, 0);
+    player.gravitation = true;
+    // physics.gravitation.player = &g;
     // physics.dropable.push_back(g);
 
     SDL_Init( SDL_INIT_VIDEO | SDL_INIT_TIMER);
@@ -124,6 +125,7 @@ void Game::init(int w, int h){
     mewkie.compile();
     mewkie.init(770, 352);
     // mewkie.init(580, 480);
+    mewkie.gravity = physics.gravity(0.125, 0);
     enemies.push_back(mewkie);
 
     mewkie = * new Enemy();

@@ -210,6 +210,56 @@ class Collider{
     bool check(Collider collider);
 };
 
+class Gravity{
+    // private:
+   // T *sprite;  // Actual pointer
+    // public:
+   // Constructor
+
+    public:
+        float gravity;
+        float buoyancy;
+        float lift;
+        float speed;
+        float delay;
+        float min;
+        float max;
+        string type;
+        // T *sprite;
+        // template <class T>
+        // template<class T> const T;
+        // Enemy* enemy;
+        // map<string, FieldInterface* > target;
+        // struct Target{
+        //     Player* player;
+        //     Enemy* enemy;
+        // } target;
+        // Player* sprite;
+
+        // explicit Gravity(T* s = NULL, float factor = 1,  int delay = 0); //{ sprite = s; }
+        // ~Gravity() { delete(sprite); }
+
+        // Overloading dereferncing operator
+        // T & operator * () {  return *sprite; }
+
+        // Overloding arrow operator so that members of T can be accessed
+        // like a pointer (useful if T represents a class or struct or
+        // union type)
+        // T * operator -> () { return sprite; }
+
+        Gravity(float factor,  int delay);
+        // Gravity(Sprite* s, float factor,  int delay);
+        // Gravity(Player* s, float factor,  int delay);
+
+        template <class T>
+        void update(T* sprite);
+        void reset();
+        template <class T>
+        void bound(T* sprite);
+        template <class T>
+        bool fallthru(T* sprite);
+};
+
 class Player: public Sprite{
     public:
         double x;
@@ -227,18 +277,19 @@ class Player: public Sprite{
         string state;
         map< string, array<array<int, SPRITE_SIZE>, FRAMES> > states;
         Collider *collider;
+        Gravity *gravity;
 
         Player();
         // ~Player();
-        Player(const Player &P);             // copy constructor
+        // Player(const Player &P);             // copy constructor
         // Player & operator=(const Player &P); // assignment
         virtual void init(double x, double y);
         virtual void move();
         virtual void update();
         virtual void render();
         virtual void define(string name, array<array<int, SPRITE_SIZE>, FRAMES> frames);
-        virtual int index(double x, double y);
-        virtual int adjacent(int direction, double x, double y);
+        virtual int  index(double x, double y);
+        virtual int  adjacent(int direction, double x, double y);
         virtual bool traverse(int direction);
         virtual bool traverse(int direction, double x, double y);
         virtual array<array<int, SPRITE_SIZE>, FRAMES>
@@ -271,6 +322,7 @@ class Enemy: public Sprite{
         map< string, array<array<int, SPRITE_SIZE>, FRAMES> > states;
         map<string, array<SDL_Texture*, FRAMES> > cache;
         Collider *collider;
+        Gravity *gravity;
 
         Enemy();
         // ~Enemy();
@@ -300,53 +352,6 @@ class Enemy: public Sprite{
         void walk();
 };
 
-template <class T>
-class Gravity{
-    // private:
-   T *sprite;  // Actual pointer
-public:
-   // Constructor
-
-
-    public:
-        float gravity;
-        float buoyancy;
-        float lift;
-        float speed;
-        float delay;
-        float min;
-        float max;
-        string type;
-        // template <class T>
-        // template<class T> const T;
-        // Enemy* enemy;
-        // map<string, FieldInterface* > target;
-        // struct Target{
-        //     Player* player;
-        //     Enemy* enemy;
-        // } target;
-        // Player* sprite;
-
-        explicit Gravity(T* s = NULL, float factor = 1,  int delay = 0); //{ sprite = s; }
-        ~Gravity() { delete(sprite); }
-
-        // Overloading dereferncing operator
-        T & operator * () {  return *sprite; }
-
-        // Overloding arrow operator so that members of T can be accessed
-        // like a pointer (useful if T represents a class or struct or
-        // union type)
-        T * operator -> () { return sprite; }
-
-        // Gravity(Sprite* s, float factor,  int delay);
-        // Gravity(Player* s, float factor,  int delay);
-
-        void update();
-        void reset();
-        void bound();
-        bool fallthru();
-};
-
 class Physics{
     public:
         class Collision{
@@ -354,16 +359,14 @@ class Physics{
                 void check();
         } collision;
 
-        // template <class T>
-        struct Gravitation{
-            Gravity<Player>* player;
-            vector< Gravity<Enemy>* > enemies;
-        } gravitation;
+        // struct Gravitation{
+        //     Gravity<Player>* player;
+        //     vector< Gravity<Enemy>* > enemies;
+        // } gravitation;
 
         Physics();
 
-        template <class T>
-        Gravity<T> gravity(T* sprite, float factor,  int delay);
+        Gravity* gravity(float factor,  int delay);
         void bounce();
         void update();
 };

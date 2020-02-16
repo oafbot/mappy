@@ -4,25 +4,22 @@ using namespace std;
 Physics::Physics(){}
 
 void Physics::update(){
-    gravitation.player->update();
-
+    // gravitation.player.update();
+    player.gravity->update(&player);
+    for(int i=0; i < game.enemies.size(); i++) {
+        game.enemies[i].gravity->update(&game.enemies[i]);
+    }
+    // cout << gravitation.player->sprite->y <<endl;
     // for(int i=0; i < gravitation.enemies.size(); i++) {
     //     gravitation.enemies[i]->update();
     // }
 }
 
-template <class T>
-Gravity<T> Physics::gravity(T* s, float factor,  int delay){
-    return * new Gravity<Player>(s, factor, delay);
+Gravity* Physics::gravity(float factor,  int delay){
+    return new Gravity(factor, delay);
 }
-// Gravity Physics::gravity(Player s, float factor,  int delay){
-//     return * new Gravity(s, factor, delay);
-// }
 
-template<class T>
-Gravity<T>::Gravity(T* s, float factor,  int delay): sprite(s){
-    cout << typeid(s).name() << endl;
-    cout << s->x << ", " << s->y << endl;
+Gravity::Gravity(float factor,  int delay){
     this->gravity  = /*0.98**/factor;
     this->buoyancy = 0.098*2*factor;
     this->lift  = 0;
@@ -30,21 +27,17 @@ Gravity<T>::Gravity(T* s, float factor,  int delay): sprite(s){
     this->delay = delay ? delay : 0;
     this->min = SCALE;
     this->max = BYTE;
-    this->type = "player";
+    // this->type = "player";
     // this->sprite = s;
     // this->sprite = unique_ptr<Player>( dynamic_cast<Player*>(s) );
     // this->sprite = dynamic_cast<Player *>(s);
-    this->sprite->gravitation = true;
-    cout << typeid(sprite).name() << endl;
-    cout << sprite->index(sprite->x, sprite->y) << endl;
+    // this->sprite->gravitation = true;
+    // cout << typeid(sprite).name() << endl;
+    // cout << sprite->index(sprite->x, sprite->y) << endl;
 }
 
-// void Gravity::bind(Player* s){
-//     this->sprite = s;
-//     this->sprite->gravitation = true;
-// }
 template <class T>
-bool Gravity<T>::fallthru(){
+bool Gravity::fallthru(T* sprite){
     int index = sprite->index(sprite->x, sprite->y)+LEVEL_WIDTH;
 
     for(int t=0; t<game.objects["trampoline"].size(); t++){
@@ -65,7 +58,7 @@ bool Gravity<T>::fallthru(){
 }
 
 template <class T>
-void Gravity<T>::update(){
+void Gravity::update(T* sprite){
     int tile, index;
     vector<int> group;
 
@@ -73,7 +66,7 @@ void Gravity<T>::update(){
         double ground = game.stage.bottom - (sprite->height*SCALE);
         double s = sprite->y + speed + gravity;
 
-        if(!sprite->bouncing && fallthru()){
+        if(!sprite->bouncing && fallthru(sprite)){
             lift = 0;
 
             if(s < ground){
@@ -120,7 +113,7 @@ void Gravity<T>::update(){
                     // cout << game.objects["trampoline"][t].bounces << endl;
                     if(game.objects["trampoline"][t].bounces<BOUNCES && !game.objects["trampoline"][t].active){
                         game.objects["trampoline"][t].active = true;
-                        bound();
+                        bound(sprite);
                     }
                     else if(game.objects["trampoline"][t].active){
                         // cout << "active" << endl;
@@ -153,13 +146,13 @@ void Gravity<T>::update(){
     }
 }
 
-template <class T>
-void Gravity<T>::reset(){
+
+void Gravity::reset(){
     this->speed = 0;
 }
 
 template <class T>
-void Gravity<T>::bound(){
+void Gravity::bound(T* sprite){
     sprite->falling = false;
     sprite->bouncing = true;
 
