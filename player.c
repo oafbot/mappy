@@ -12,20 +12,19 @@ Player::Player() : Sprite(){
     this->state = "left";
     this->frame = 0;
     this->dead = false;
+    this->repeat = 2;
+    this->cycle = 0;
+    this->collider = new Collider(this);
 };
 
 void Player::init(double x, double y){
-    this->x = x-this->width/2;
-    this->y = y-this->height/2;
-    // this->data = data.sprites;
+    this->x = x;
+    this->y = y;
+    collider->init(x, y, width-8, height);
 }
 
-// void Player::stopBounce(){
-//     bouncing = false;
-// };
-
 void Player::move(){
-    if( game.controls.left_key_down ) {
+    if( game.controls.left_key_down && !game.controls.lock) {
         if(traverse(LEFT)){
             if(this->x>game.stage.left){
                 if(!game.scrolling){
@@ -40,9 +39,7 @@ void Player::move(){
             }
             if(bouncing){
                 // state = "hop-left";
-                if(game.delay()){
-                    return;
-                };
+                if(game.delay()){ return; }
                 bouncing = false;
             }
             // else if(falling){
@@ -51,7 +48,7 @@ void Player::move(){
         }
     }
 
-    if( game.controls.right_key_down ) {
+    if( game.controls.right_key_down && !game.controls.lock) {
         if(traverse(RIGHT)){
             if(this->x<game.stage.right-this->width*2){
                 if(!game.scrolling){
@@ -66,9 +63,7 @@ void Player::move(){
             }
             if(bouncing){
                 // state = "hop-right";
-                if(game.delay()){
-                    return;
-                };
+                if(game.delay()){ return; }
                 bouncing = false;
             }
             // else if(falling){
@@ -94,7 +89,8 @@ bool Player::traverse(int direction, double x, double y){
     return false;
 }
 
-array<double, 2> Player::position(){
+array<double, 2>
+Player::position(){
     array<double, 2> coord;
     return coord;
 }
@@ -173,7 +169,8 @@ void Player::draw(const array<array<int, SPRITE_SIZE>, FRAMES> &bits){
     }
 }
 
-array<array<int, SPRITE_SIZE>, FRAMES> Player::flip(array<array<int, SPRITE_SIZE>, FRAMES> frames){
+array<array<int, SPRITE_SIZE>, FRAMES>
+Player::flip(array<array<int, SPRITE_SIZE>, FRAMES> frames){
     array<array<int, SPRITE_SIZE>, FRAMES> flipped;
     array<array<int, DIM>, SPRITE_SIZE/DIM> rows;
     array<int, SPRITE_SIZE> flat;
@@ -215,10 +212,15 @@ void Player::update(){
             this->state = "drop";
         }
         else if(this->bouncing && !game.controls.key_down){
-            this->state = "bound";
+            if(this->y<300){
+                this->state = "turn";
+            }else{
+                this->state = "bound";
+            }
         }
         else{
             if(this->falling || this->bouncing){
+                // if(state!="turn")
                 this->state = this->direction=="left" ? "hop-left" : "hop-right";
             }
             else{
@@ -230,24 +232,37 @@ void Player::update(){
 
     }
 
-
     if(game.scrolling && (game.offset.x>=64 || game.offset.x<=-128)){
         game.scrolling = false;
     }
     else if(x>game.center.x-64 && x+width<game.center.x+64){
          game.scrolling = true;
     }
+
+    collider->update(x+4, y);
+
+    for(int i=0; i<game.enemies.size(); i++){
+        if(collision(*game.enemies[i].collider)){
+            deaded();
+            break;
+        }
+    }
 }
 
 void Player::render(){
-    if(game.controls.key_down || state=="spin" || state=="dead"){
+    if(game.controls.key_down ||
+       state=="spin" || state=="dead" || state=="drop" || state=="bound"){
         if( frame >= FRAME_COUNT ) {
             if(state=="spin"){
-                state = "dead";
+                if(cycle<repeat){
+                    cycle++;
+                }
+                else{
+                    state = "dead";
+                    cycle = 0;
+                }
             }
-            else{
-                frame = 0;
-            }
+            frame = 0;
         }
         else{
             frame++;
@@ -257,8 +272,16 @@ void Player::render(){
 }
 
 void Player::deaded(){
-    state = "spin";
-    bouncing = false;
-    falling = false;
-    dead = true;
+    if(!dead){
+        state = "spin";
+        bouncing = false;
+        falling  = false;
+        dead = true;
+        game.controls.lock = true;
+    }
+}
+
+bool Player::collision(Collider complement){
+    // cout << this->collider->check(complement) << endl;
+    return this->collider->check(complement);
 }

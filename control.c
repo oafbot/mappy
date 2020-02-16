@@ -10,25 +10,34 @@ void Control::input(){
                         if(!player.dead && !lock){
                             this->left_key_down = true;
                             this->key_down = true;
-                            player.direction = "left";
+                            // cout << player.x+game.offset.x << ", " << player.y+game.offset.y << endl;
                             if(!player.falling && !player.bouncing){
                                 player.state = "left";
-                            }else{
+                            }
+                            // else if(player.direction!="left"){
+                            //     player.state = "turn";
+                            // }
+                            else{
                                 player.state = "hop-left";
                             }
+                            player.direction = "left";
                         }
                         break;
                     case SDLK_RIGHT:
                         if(!player.dead && !lock){
                             this->right_key_down = true;
                             this->key_down = true;
-                            player.direction = "right";
+
                             if(!player.falling && !player.bouncing){
                                 player.state = "right";
                             }
+                            // else if(player.direction!="right"){
+                            //     player.state = "turn";
+                            // }
                             else{
                                 player.state = "hop-right";
                             }
+                            player.direction = "right";
                         }
                         break;
                     case SDLK_UP:

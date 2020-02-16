@@ -9,11 +9,18 @@ void Physics::update(){
     }
 }
 
-Gravity Physics::gravity(float factor,  int delay){
-    return * new Gravity(factor, delay);
+template<class T>
+Gravity<T> Physics::gravity(T* s, float factor,  int delay){
+    return * new Gravity<T>(s, factor, delay);
 }
+// Gravity Physics::gravity(Player s, float factor,  int delay){
+//     return * new Gravity(s, factor, delay);
+// }
 
-Gravity::Gravity(float factor,  int delay){
+template<class T>
+Gravity<T>::Gravity(T* s, float factor,  int delay): sprite(s){
+    cout << typeid(s).name() << endl;
+    cout << s->x << ", " << s->y << endl;
     this->gravity  = /*0.98**/factor;
     this->buoyancy = 0.098*2*factor;
     this->lift  = 0;
@@ -21,15 +28,19 @@ Gravity::Gravity(float factor,  int delay){
     this->delay = delay ? delay : 0;
     this->min = SCALE;
     this->max = BYTE;
+    // this->sprite = s;
+    this->sprite->gravitation = true;
+    cout << typeid(sprite).name() << endl;
+    cout << s->index(s->x, s->y) << endl;
 }
 
-void Gravity::bind(Player* p){
-    this->player = p;
-    this->player->gravitation = true;
-}
-
-bool Gravity::fallthru(){
-    int index = player->index(player->x, player->y)+LEVEL_WIDTH;
+// void Gravity::bind(Player* s){
+//     this->sprite = s;
+//     this->sprite->gravitation = true;
+// }
+template<class T>
+bool Gravity<T>::fallthru(){
+    int index = sprite->index(sprite->x, sprite->y)+LEVEL_WIDTH;
 
     for(int t=0; t<game.objects["trampoline"].size(); t++){
         vector<int> group = game.objects["trampoline"][t].group;
@@ -37,42 +48,41 @@ bool Gravity::fallthru(){
         if(find(begin(group), end(group), index) != end(group)){
             if(game.objects["trampoline"][t].bounces>=BOUNCES){
                 speed = 0.5;
-                player->frame = 0;
-                player->state = "spin";
+                sprite->frame = 0;
+                sprite->state = "spin";
                 game.objects["trampoline"][t].bounce();
                 return true;
             }
         }
     }
-    return player->traverse(DOWN, player->x, player->y + speed + gravity);
+    return sprite->traverse(DOWN, sprite->x, sprite->y + speed + gravity);
 }
-
-void Gravity::update(){
+template<class T>
+void Gravity<T>::update(){
     int tile, index;
     vector<int> group;
 
-    if(!game.PAUSED && delay==0 && player->gravitation){
-        double ground = game.stage.bottom - (player->height*SCALE);
-        double s = player->y + speed + gravity;
+    if(!game.PAUSED && delay==0 && sprite->gravitation){
+        double ground = game.stage.bottom - (sprite->height*SCALE);
+        double s = sprite->y + speed + gravity;
 
-        if(!player->bouncing && fallthru()){
+        if(!sprite->bouncing && fallthru()){
             lift = 0;
 
             if(s < ground){
                 speed += speed+gravity<max ? gravity : 0;
-                player->y += round(speed);
-                player->falling = true;
-                // printf("%f\n", player->y);
+                sprite->y += round(speed);
+                sprite->falling = true;
             }
             else{
-                player->y = ground;
-                player->falling = false;
+                sprite->y = ground;
+                sprite->falling = false;
                 speed = 0;
             }
         }
         else{
-            if(!player->bouncing){
-                player->align();
+            if(!sprite->bouncing){
+                sprite->align();
                 for(int t=0; t<game.objects["trampoline"].size(); t++){
                     game.objects["trampoline"][t].reset();
                     game.objects["trampoline"][t].bounces = 0;
@@ -80,14 +90,14 @@ void Gravity::update(){
                     game.objects["trampoline"][t].active = false;
                 }
             }
-            player->falling = false;
+            sprite->falling = false;
             speed = 0;
         }
 
-        tile = player->adjacent(DOWN, player->x, player->y);
+        tile = sprite->adjacent(DOWN, sprite->x, sprite->y);
 
         if(tile==2){
-            index = player->index(player->x, player->y)+LEVEL_WIDTH;
+            index = sprite->index(sprite->x, sprite->y)+LEVEL_WIDTH;
 
             for(int t=0; t<game.objects["trampoline"].size(); t++){
                 group = game.objects["trampoline"][t].group;
@@ -106,7 +116,7 @@ void Gravity::update(){
                         // pass
                     }
                     else{
-                        player->deaded();
+                        sprite->deaded();
                     }
                 }
                 else{
@@ -115,39 +125,30 @@ void Gravity::update(){
             }
         }
 
-        if(player->bouncing){
-            if( game.delay() ){
-                return;
-            }
+        if(sprite->bouncing){
+            if( game.delay() ){ return; }
 
-            // int t = game.trampoline();
-            // if(t>=0){
-            //     if(game.objects["trampoline"][t].active){
-            //         // game.objects["trampoline"][t].bounce();
-            //     }
-            // }
+            sprite->y -= lift;
 
-            player->y -= lift;
-
-            tile = player->adjacent(UP, player->x, player->y);
+            tile = sprite->adjacent(UP, sprite->x, sprite->y);
 
             if(tile!=0){
                 lift = 0;
-                player->falling = true;
-                player->bouncing = false;
-                player->state = "drop";
+                sprite->state = "turn";
+                sprite->falling = true;
+                sprite->bouncing = false;
             }
         }
     }
 }
-
-void Gravity::reset(){
+template<class T>
+void Gravity<T>::reset(){
     this->speed = 0;
 }
-
-void Gravity::bound(){
-    player->falling = false;
-    player->bouncing = true;
+template<class T>
+void Gravity<T>::bound(){
+    sprite->falling = false;
+    sprite->bouncing = true;
 
     if(lift==0){
         lift = max*3;
@@ -156,3 +157,32 @@ void Gravity::bound(){
     //     lift = lift>min ? lift - gravity : min;
     // }
 };
+
+
+Collider::Collider(Sprite* obj){
+    this->object = obj;
+}
+
+void Collider::init(double x, double y, int w, int h){
+    this->x = x;
+    this->y = y;
+    this->width  = w*SCALE;
+    this->height = h*SCALE;
+}
+
+void Collider::update(double x, double y){
+    this->x = x;//ffset ? this->object->x+game.offset.x : this->object->x;
+    this->y = y;//offset ? this->object->y+game.offset.y : this->object->y;
+}
+
+bool Collider::check(Collider collider){
+    double ax0 = x,
+           ax1 = x + width,
+           ay0 = y,
+           ay1 = y + height,
+           bx0 = collider.x,
+           bx1 = collider.x + collider.width,
+           by0 = collider.y,
+           by1 = collider.y + collider.height;
+    return !( ax1 < bx0 || ax0 > bx1 || ay0 > by1 || ay1 < by0 );
+}

@@ -26,6 +26,10 @@ void Game::update(){
     player.update();
     player.move();
     physics.update();
+
+    for(int i=0; i<enemies.size(); i++){
+        enemies[i].update();
+    }
 }
 
 bool Game::delay(){
@@ -40,6 +44,16 @@ bool Game::delay(){
     return false;
 }
 
+bool Game::delay(int delay, Uint32 start){
+    Uint32 current = SDL_GetTicks();
+
+    if(current - start < delay){
+        return true;
+    }
+    return false;
+}
+
+
 void Game::renderObjects(){
     for(int i=0; i<objects["trampoline"].size(); i++){
         if(objects["trampoline"][i].assigned){
@@ -47,6 +61,9 @@ void Game::renderObjects(){
             // cout << objects["trampoline"][i]->frame << "\n";
             // cout << objects["trampoline"][i]->state << "\n";
         }
+    }
+    for(int i=0; i<enemies.size(); i++){
+        enemies[i].render();
     }
 }
 
@@ -87,15 +104,12 @@ void Game::init(int w, int h){
     this->stage.bottom -= DIM*SCALE;
 
     physics = * new Physics();
-    Gravity g = physics.gravity(0.125, 0);/*0.125*/
-    g.bind(&player);
+    Gravity<Player> g = physics.gravity(&player, 0.125, 0);
     physics.dropable.push_back(g);
 
-    SDL_Init( SDL_INIT_VIDEO );
+    SDL_Init( SDL_INIT_VIDEO | SDL_INIT_TIMER);
     SDL_CreateWindowAndRenderer(w, h, 0, &window, &renderer);
 
-    SDL_SetRenderDrawColor( renderer, 0, 0, 0, 255 );
-    SDL_RenderClear( renderer );
     // SDL_RenderPresent(renderer);
     this->mapper.init();
 
@@ -104,6 +118,29 @@ void Game::init(int w, int h){
         trampoline.compile();
         objects["trampoline"].push_back(trampoline);
     }
+
+    Enemy mewkie = * new Enemy();
+    mewkie.compile();
+    mewkie.init(770, 352);
+    // mewkie.init(580, 480);
+    enemies.push_back(mewkie);
+
+    mewkie = * new Enemy();
+    mewkie.compile();
+    mewkie.init(80, 160);
+    // mewkie.init(208, 224);
+    mewkie.state = "right";
+    enemies.push_back(mewkie);
+
+
+    SDL_SetRenderDrawColor( renderer, 0, 0, 0, 255 );
+    SDL_RenderClear( renderer );
+    // for(int i=0; i<9; i++){
+    //     Enemy mewkie = * new Enemy();
+    //     mewkie.compile();
+    //     mewkie.init(i*32, 10);
+    //     enemies.push_back(mewkie);
+    // }
 }
 
 int Game::trampoline(){

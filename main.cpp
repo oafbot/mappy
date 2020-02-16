@@ -2,6 +2,7 @@
 #include "data.c"
 #include "sprite.c"
 #include "player.c"
+#include "enemy.c"
 #include "physics.c"
 #include "control.c"
 #include "objects.c"
@@ -36,15 +37,16 @@ void init(){
     f3 = {b[5], b[5], b[5], b[5], b[5], b[5], b[5], b[5]}, // hop
     f5 = {b[7], b[8], b[9], b[10], b[11], b[12], b[13], b[14]}, // spin
     f6 = {b[15], b[15], b[16], b[16], b[15], b[15], b[16], b[16]}; // dead
+
     player.define("left", f0);
     player.define("right", player.flip(f0));
     player.define("drop", f1);
-    player.define("bound", f2);
+    player.define("bound", f1);
+    player.define("turn", f2);
     player.define("hop-left", f3);
     player.define("hop-right", player.flip(f3));
     player.define("spin", f5);
     player.define("dead", f6);
-
     game.setup();
 }
 
@@ -55,11 +57,13 @@ void gameloop(){
 }
 
 int main(){
-    game = * new Game();
-    game.init(800, 600);
 
     player = * new Player();
     player.init(580, 480);
+
+    game = * new Game();
+    game.init(800, 600);
+
     init();
 
     // last_frame_time = last_time = SDL_GetTicks();

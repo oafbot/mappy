@@ -25,7 +25,7 @@ void GameObject::compile(){
         string s = it->first;
         array<SDL_Texture*, FRAMES> images;
         // it->second[f].size()
-        for(int f=0; f<FRAME_COUNT; f++){
+        for(int f=0; f<FRAMES; f++){
             SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width*SCALE, height*SCALE);
             SDL_SetRenderTarget(renderer, texture);
 
