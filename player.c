@@ -89,11 +89,11 @@ bool Player::traverse(int direction, double x, double y){
     return false;
 }
 
-array<double, 2>
-Player::position(){
-    array<double, 2> coord;
-    return coord;
-}
+// array<double, 2>
+// Player::position(){
+//     array<double, 2> coord;
+//     return coord;
+// }
 
 int Player::index(double x, double y){
     // printf("%f %f\n", x, y);

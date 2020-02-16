@@ -78,6 +78,16 @@ class Stage{
         Stage(int w, int h);
 };
 
+// class FieldInterface{
+//     int m_Size;
+//     ~FieldInterface() = default;
+// };
+
+// template <typename T>
+// class Field : public FieldInterface {
+//     T m_Value;
+// };
+
 class Control{
     public:
         bool left_key_down;
@@ -92,41 +102,39 @@ class Control{
 };
 
 class Sprite{
-    // private:
     public:
         double x;
         double y;
+
         int width;
         int height;
         int frame;
         int cycle;
         int repeat;
+
         bool gravitation;
         bool falling;
         bool bouncing;
         bool dead;
+
         string direction;
         string state;
+
         map< string, array<array<int, SPRITE_SIZE>, FRAMES> > states;
-        // array< array<int, 2>, 2> frames;
         //Collider *collider;
 
         // Sprite();
-        // ~Sprite();
-        // virtual void draw() = 0;
-        // virtual bool collision() = 0;
-        // virtual void flip() = 0;
+        // Sprite(const Sprite &S);
+        // virtual ~Sprite();
         // virtual void animate() = 0;
-
         virtual void init(double x, double y) = 0;
         virtual void update() = 0;
         virtual void move() = 0;
         virtual void render() = 0;
-        // virtual void draw(const array<array<int, SPRITE_SIZE>, FRAMES> &data) = 0;
+        virtual void draw(const array<array<int, SPRITE_SIZE>, FRAMES> &data) = 0;
         virtual void define(string name, array<array<int, SPRITE_SIZE>, FRAMES> frames) = 0;
-        virtual int index(double x, double y) = 0;
-        // virtual int adjacent(int direction) = 0;
-        virtual int adjacent(int direction, double x, double y) = 0;
+        virtual int  index(double x, double y) = 0;
+        virtual int  adjacent(int direction, double x, double y) = 0;
         virtual bool traverse(int direction) = 0;
         virtual bool traverse(int direction, double x, double y) = 0;
         virtual void align() = 0;
@@ -136,8 +144,6 @@ class Sprite{
         // array<double, 2> position();
         // bool collision(Collider complement);
 };
-
-
 
 class GameObjects{
 
@@ -206,13 +212,13 @@ class Collider{
 
 class Player: public Sprite{
     public:
+        double x;
+        double y;
         int width;
         int height;
         int frame;
         int cycle;
         int repeat;
-        double x;
-        double y;
         bool gravitation;
         bool falling;
         bool bouncing;
@@ -221,11 +227,10 @@ class Player: public Sprite{
         string state;
         map< string, array<array<int, SPRITE_SIZE>, FRAMES> > states;
         Collider *collider;
-        // array< array<int, 2>, 2> frames;
 
         Player();
         // ~Player();
-        // Player(const Player &P);             // copy constructor
+        Player(const Player &P);             // copy constructor
         // Player & operator=(const Player &P); // assignment
         virtual void init(double x, double y);
         virtual void move();
@@ -233,13 +238,12 @@ class Player: public Sprite{
         virtual void render();
         virtual void define(string name, array<array<int, SPRITE_SIZE>, FRAMES> frames);
         virtual int index(double x, double y);
-        // virtual int adjacent(int direction);
         virtual int adjacent(int direction, double x, double y);
         virtual bool traverse(int direction);
         virtual bool traverse(int direction, double x, double y);
         virtual array<array<int, SPRITE_SIZE>, FRAMES>
             flip(array<array<int, SPRITE_SIZE>, FRAMES> frames);
-        array<double, 2> position();
+        // array<double, 2> position();
         virtual void align();
         virtual void deaded();
 
@@ -269,7 +273,7 @@ class Enemy: public Sprite{
         Collider *collider;
 
         Enemy();
-        // virtual ~Enemy();
+        // ~Enemy();
         virtual void init(double x, double y);
         virtual void move();
         virtual void update();
@@ -278,13 +282,13 @@ class Enemy: public Sprite{
             flip(array<array<int, SPRITE_SIZE>, FRAMES> frames);
         virtual void define(string name, array<array<int, SPRITE_SIZE>, FRAMES> frames);
         virtual int index(double x, double y);
-        virtual int adjacent(int direction);
         virtual int adjacent(int direction, double x, double y);
         virtual bool traverse(int direction);
         virtual bool traverse(int direction, double x, double y);
         // array<double, 2> position();
         virtual void align();
         virtual void deaded();
+        virtual void draw(const array<array<int, SPRITE_SIZE>, FRAMES> &data){};
 
         void draw(const array<int, SPRITE_SIZE> &bits);
         void compile();
@@ -296,16 +300,14 @@ class Enemy: public Sprite{
         void walk();
 };
 
-// class Gravity {
-// A* m_myA;
-// // I know this doesn't work due to the abstract definition, but this is my goal
-// public:
-//     X(A* myA) : m_myA(myA) {}
-// }
-
-template<class T>
+template <class T>
 class Gravity{
     // private:
+   T *sprite;  // Actual pointer
+public:
+   // Constructor
+
+
     public:
         float gravity;
         float buoyancy;
@@ -314,17 +316,31 @@ class Gravity{
         float delay;
         float min;
         float max;
+        string type;
         // template <class T>
         // template<class T> const T;
         // Enemy* enemy;
-        T* sprite;
+        // map<string, FieldInterface* > target;
+        // struct Target{
+        //     Player* player;
+        //     Enemy* enemy;
+        // } target;
+        // Player* sprite;
 
-        Gravity(T* s, float factor,  int delay);
+        explicit Gravity(T* s = NULL, float factor = 1,  int delay = 0); //{ sprite = s; }
+        ~Gravity() { delete(sprite); }
+
+        // Overloading dereferncing operator
+        T & operator * () {  return *sprite; }
+
+        // Overloding arrow operator so that members of T can be accessed
+        // like a pointer (useful if T represents a class or struct or
+        // union type)
+        T * operator -> () { return sprite; }
+
         // Gravity(Sprite* s, float factor,  int delay);
         // Gravity(Player* s, float factor,  int delay);
-        // void bind(Sprite* player);
-        // void bind(Player* player);
-        // void bind(Enemy enemy);
+
         void update();
         void reset();
         void bound();
@@ -338,11 +354,15 @@ class Physics{
                 void check();
         } collision;
 
-        template<class T>
-        static vector< Gravity<T> > dropable;
+        // template <class T>
+        struct Gravitation{
+            Gravity<Player>* player;
+            vector< Gravity<Enemy>* > enemies;
+        } gravitation;
 
         Physics();
-        template<class T>
+
+        template <class T>
         Gravity<T> gravity(T* sprite, float factor,  int delay);
         void bounce();
         void update();

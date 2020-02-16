@@ -4,14 +4,16 @@ using namespace std;
 Physics::Physics(){}
 
 void Physics::update(){
-    for(int i=0; i < this->dropable.size(); i++) {
-        dropable[i].update();
-    }
+    gravitation.player->update();
+
+    // for(int i=0; i < gravitation.enemies.size(); i++) {
+    //     gravitation.enemies[i]->update();
+    // }
 }
 
-template<class T>
+template <class T>
 Gravity<T> Physics::gravity(T* s, float factor,  int delay){
-    return * new Gravity<T>(s, factor, delay);
+    return * new Gravity<Player>(s, factor, delay);
 }
 // Gravity Physics::gravity(Player s, float factor,  int delay){
 //     return * new Gravity(s, factor, delay);
@@ -28,17 +30,20 @@ Gravity<T>::Gravity(T* s, float factor,  int delay): sprite(s){
     this->delay = delay ? delay : 0;
     this->min = SCALE;
     this->max = BYTE;
+    this->type = "player";
     // this->sprite = s;
+    // this->sprite = unique_ptr<Player>( dynamic_cast<Player*>(s) );
+    // this->sprite = dynamic_cast<Player *>(s);
     this->sprite->gravitation = true;
     cout << typeid(sprite).name() << endl;
-    cout << s->index(s->x, s->y) << endl;
+    cout << sprite->index(sprite->x, sprite->y) << endl;
 }
 
 // void Gravity::bind(Player* s){
 //     this->sprite = s;
 //     this->sprite->gravitation = true;
 // }
-template<class T>
+template <class T>
 bool Gravity<T>::fallthru(){
     int index = sprite->index(sprite->x, sprite->y)+LEVEL_WIDTH;
 
@@ -55,9 +60,11 @@ bool Gravity<T>::fallthru(){
             }
         }
     }
+    // cout << sprite->x << " " << sprite->y << " " << speed << " " <<  gravity <<endl;
     return sprite->traverse(DOWN, sprite->x, sprite->y + speed + gravity);
 }
-template<class T>
+
+template <class T>
 void Gravity<T>::update(){
     int tile, index;
     vector<int> group;
@@ -95,6 +102,10 @@ void Gravity<T>::update(){
         }
 
         tile = sprite->adjacent(DOWN, sprite->x, sprite->y);
+
+        // if(tile != 0){
+        //     cout << tile << endl;
+        // }
 
         if(tile==2){
             index = sprite->index(sprite->x, sprite->y)+LEVEL_WIDTH;
@@ -141,11 +152,13 @@ void Gravity<T>::update(){
         }
     }
 }
-template<class T>
+
+template <class T>
 void Gravity<T>::reset(){
     this->speed = 0;
 }
-template<class T>
+
+template <class T>
 void Gravity<T>::bound(){
     sprite->falling = false;
     sprite->bouncing = true;

@@ -105,7 +105,8 @@ void Game::init(int w, int h){
 
     physics = * new Physics();
     Gravity<Player> g = physics.gravity(&player, 0.125, 0);
-    physics.dropable.push_back(g);
+    physics.gravitation.player = &g;
+    // physics.dropable.push_back(g);
 
     SDL_Init( SDL_INIT_VIDEO | SDL_INIT_TIMER);
     SDL_CreateWindowAndRenderer(w, h, 0, &window, &renderer);

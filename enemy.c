@@ -186,7 +186,7 @@ bool Enemy::collision(Collider complement){
 }
 
 int Enemy::index(double x, double y){ return 0; }
-int Enemy::adjacent(int direction){ return 0; }
+// int Enemy::adjacent(int direction){ return 0; }
 int Enemy::adjacent(int direction, double x, double y){ return 0; }
 bool Enemy::traverse(int direction){ return true; }
 bool Enemy::traverse(int direction, double x, double y){ return true; }
