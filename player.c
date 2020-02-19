@@ -16,6 +16,7 @@ Player::Player() : Sprite(){
     this->repeat = 2;
     this->cycle = 0;
     this->collider = new Collider(this);
+    this->bounces = 0;
 
     this->absolute.x = x + (game.stage.full_width - game.offset.x);
     this->absolute.y = y + game.offset.y;
@@ -304,6 +305,11 @@ bool Player::collision(Collider complement){
     return this->collider->check(complement);
 }
 
-void Player::bounce(bool start=NULL){
-
+void Player::bounce(){
+    if(bounces<=BOUNCES){
+        bounces++;
+    }
+    // else{
+    //     deaded();
+    // }
 }

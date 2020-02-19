@@ -22,6 +22,7 @@ Game::Game() : stage(0,0){
     this->offset.y = 0;
     this->scrolling = true;
     this->controls.lock = false;
+    this->tiers = 6;
 }
 
 void Game::update(){

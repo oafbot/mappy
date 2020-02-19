@@ -30,6 +30,7 @@ Enemy::Enemy() : Sprite(){
     this->animated = true;
     // this->dead = false;
     this->collider = new Collider(this);
+    this->bounces = -1;
 };
 
 void Enemy::init(double x, double y){
@@ -298,21 +299,15 @@ void Enemy::move(){
 
 void Enemy::hop(int i){
     y = i<25 ? y - 0.25 : y + 0.25;
-    x = direction=="right" ? x + 0.5 : x - 0.5;
-    // if(i>12) falling = false;
+    x = direction=="right" ? x + 0.25 : x - 0.25;
 }
 
 void Enemy::hopoff(){
     bouncing = false;
     falling = false;
 
-    // gravity->lift = 0;
-    // gravity->speed = 0;
-
     if(game.delay()){ return; };
 
-    // cout << x << endl;
-    // cout << traverse(DOWN) << endl;
     if(traverse(DOWN)){
         if(direction=="left" && traverse(LEFT)){
             for(int i=0; i<48; i++){
@@ -330,6 +325,7 @@ void Enemy::hopoff(){
         falling = false;
         move();
     }
+    bounces = -1;
 }
 
 void Enemy::wander(){
@@ -362,22 +358,19 @@ void Enemy::wander(){
             }
         }
     }
-    // else if(state=="drop"){
-
+    // else{
+    //     r = rand() % 2;
+    //     switch(r){
+    //         case 0:
+    //             direction = "left";
+    //             state = "left";
+    //             break;
+    //         case 1:
+    //             direction = "right";
+    //             state = "right";
+    //             break;
+    //     }
     // }
-    else{
-        r = rand() % 2;
-        switch(r){
-            case 0:
-                direction = "left";
-                state = "left";
-                break;
-            case 1:
-                direction = "right";
-                state = "right";
-                break;
-        }
-    }
 
 }
 
@@ -386,24 +379,31 @@ void Enemy::pursue(){
 }
 
 void Enemy::decision(){
-
+    wander();
 }
 
-void Enemy::bounce(bool start=NULL){
-    if(start){
-        trampoline();
+void Enemy::bounce(){
+    if(bounces==-1){
+        tier = rand()%game.tiers;
+        bounces = rand()%3;
     }
     else{
+        if(game.delay()){
+            return;
+        }
         if(bounces>0){
             bounces--;
         }
     }
-    cout << "floor: " << tier << ", bounces: " << bounces << endl;
 }
 
 void Enemy::trampoline(){
-    tier = rand()%6;
-    bounces = rand()%3;
+    int row = index(x, y)/LEVEL_HEIGHT;
+    int pos = game.tiers-((row-10)/game.tiers);
+
+    if(pos==tier && bounces<=0){
+        wander();
+    }
 }
 
 void Enemy::walk(){
@@ -411,14 +411,7 @@ void Enemy::walk(){
         move();
     }
     else if(state=="bound"){
-        int r = rand()%6;
-        int row = index(x, y)/LEVEL_HEIGHT;
-        if(r<=row && r%2==0){
-            if(row==10 || (row-10)%4==2){
-                if(rand()%3==0)
-                    wander();
-            }
-        }
+        trampoline();
     }
     else if(state=="drop"){
         if(direction=="left" && !aligned()){
@@ -432,7 +425,7 @@ void Enemy::walk(){
         hopoff();
     }
 
-    if(game.delay(2000, timestamp)){
+    if(game.delay(3000, timestamp)){
         return;
     };
 
@@ -440,7 +433,7 @@ void Enemy::walk(){
     // cout << "falling: "  << falling << endl;
 
     if(state!="bound" && state!="drop" && state!="hop-right" && state!="hop-left"){
-        wander();
+        decision();
     }
 
     timestamp = SDL_GetTicks();

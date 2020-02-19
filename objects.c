@@ -24,7 +24,7 @@ void GameObject::compile(){
     for(map< string, vector< array< array<int, TILE_SIZE>, FRAMES> > >::iterator it=states.begin(); it!=states.end(); ++it){
         string s = it->first;
         array<SDL_Texture*, FRAMES> images;
-        // it->second[f].size()
+
         for(int f=0; f<FRAMES; f++){
             SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width*SCALE, height*SCALE);
             SDL_SetRenderTarget(renderer, texture);
@@ -34,8 +34,6 @@ void GameObject::compile(){
             }
 
             images[f] = texture;
-            // throw exception();
-            // SDL_SetRenderTarget(renderer, NULL);
         }
         this->cache.insert(make_pair(s, images));
     }
@@ -95,8 +93,6 @@ array<int, TILE_SIZE> GameObject::flip(const array<int, TILE_SIZE> bits){
             flat[k*BYTE+l] = rows[k][l];
         }
     }
-    // printf("%lu\n", flat.size());
-    // flipped[i] = flat;
     return flat;
 }
 
@@ -140,10 +136,8 @@ void GameObject::render(){
             frame++;
         }
     }
-
     SDL_RenderCopy(renderer, cache[state][frame], &src, &dest);
 }
-
 
 Trampoline::Trampoline(){
     this->state = "green";
@@ -157,6 +151,7 @@ Trampoline::Trampoline(){
     this->cycle = 0;
     this->bounces = 0;
     this->active = false;
+    this->jumper = "";
     array<array<int, TILE_SIZE>, BITMAP_SIZE> d = data.objects;
     vector< array<array<int, TILE_SIZE>, FRAMES> > g;
 
@@ -186,7 +181,6 @@ void Trampoline::assign(int index){
     group.push_back(index);
     group.push_back(index+1);
     group.push_back(index+2);
-    // cout << index << "\n";
     init();
 }
 
@@ -256,10 +250,12 @@ void Trampoline::reset(){
     this->cycle = 0;
     this->frame = 5;
     this->animated = false;
+    this->active = false;
 }
 
 void Trampoline::bounce(){
-    if(bounces<=BOUNCES){
+    // cout<<jumper<<endl;
+    if(jumper=="player" && bounces<=BOUNCES){
         bounces++;
     }
     switch(bounces){
@@ -279,8 +275,6 @@ void Trampoline::bounce(){
             state = "broken";
             break;
     }
+
     active = false;
-    // else{
-    //     bounces = 0;
-    // }
 }

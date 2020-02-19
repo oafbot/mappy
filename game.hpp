@@ -144,7 +144,7 @@ class Sprite{
         virtual bool traverse(int direction, double x, double y) = 0;
         virtual void align()  = 0;
         virtual void deaded() = 0;
-        virtual void bounce(bool start) = 0;
+        virtual void bounce() = 0;
         virtual array<array<int, SPRITE_SIZE>, FRAMES>
             flip(array<array<int, SPRITE_SIZE>, FRAMES> frames) = 0;
         // array<double, 2> position();
@@ -190,6 +190,7 @@ class GameObject{
 class Trampoline: public GameObject{
     public:
         int bounces;
+        string jumper;
 
         Trampoline();
         void init();
@@ -247,6 +248,7 @@ class Player: public Sprite{
         int frame;
         int cycle;
         int repeat;
+        int bounces;
         bool gravitation;
         bool falling;
         bool bouncing;
@@ -282,7 +284,7 @@ class Player: public Sprite{
         virtual void align();
         virtual void align(bool horiz);
         virtual void deaded();
-        virtual void bounce(bool start);
+        virtual void bounce();
 
         void draw(const array<array<int, SPRITE_SIZE>, FRAMES> &data);
         bool collision(Collider complement);
@@ -307,6 +309,7 @@ class Enemy: public Sprite{
         string direction;
         string state;
         string type;
+        string mode;
         map< string, array<array<int, SPRITE_SIZE>, FRAMES> > states;
         map<string, array<SDL_Texture*, FRAMES> > cache;
         struct Absolute{
@@ -334,7 +337,7 @@ class Enemy: public Sprite{
         virtual void align(bool horiz);
         virtual void deaded();
         virtual void draw(const array<array<int, SPRITE_SIZE>, FRAMES> &data){};
-        virtual void bounce(bool start);
+        virtual void bounce();
 
         void draw(const array<int, SPRITE_SIZE> &bits);
         void compile();
@@ -381,6 +384,7 @@ class Game{
         bool PAUSED;
         bool scrolling;
         int  level;
+        int  tiers;
         struct Center{
             double x;
             double y;
