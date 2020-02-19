@@ -22,6 +22,7 @@ using namespace std;
 #define SCALE 2
 #define DIM 16
 #define SPEED 2
+#define ENEMY_SPEED 1.2
 #define BYTE 8
 #define WORD 16
 #define LONG 32
@@ -29,6 +30,7 @@ using namespace std;
 #define RIGHT 1
 #define DOWN 2
 #define LEFT 3
+#define OFFSET 64
 #define FRAMES 8
 #define BOUNCES 3
 #define SPRITE_SIZE 256
@@ -74,6 +76,8 @@ class Stage{
         int bottom;
         int width;
         int height;
+        int full_width;
+        int full_height;
 
         Stage(int w, int h);
 };
@@ -119,6 +123,7 @@ class Sprite{
 
         string direction;
         string state;
+        string type;
 
         map< string, array<array<int, SPRITE_SIZE>, FRAMES> > states;
         //Collider *collider;
@@ -137,8 +142,9 @@ class Sprite{
         virtual int  adjacent(int direction, double x, double y) = 0;
         virtual bool traverse(int direction) = 0;
         virtual bool traverse(int direction, double x, double y) = 0;
-        virtual void align() = 0;
+        virtual void align()  = 0;
         virtual void deaded() = 0;
+        virtual void bounce(bool start) = 0;
         virtual array<array<int, SPRITE_SIZE>, FRAMES>
             flip(array<array<int, SPRITE_SIZE>, FRAMES> frames) = 0;
         // array<double, 2> position();
@@ -211,11 +217,6 @@ class Collider{
 };
 
 class Gravity{
-    // private:
-   // T *sprite;  // Actual pointer
-    // public:
-   // Constructor
-
     public:
         float gravity;
         float buoyancy;
@@ -225,31 +226,8 @@ class Gravity{
         float min;
         float max;
         string type;
-        // T *sprite;
-        // template <class T>
-        // template<class T> const T;
-        // Enemy* enemy;
-        // map<string, FieldInterface* > target;
-        // struct Target{
-        //     Player* player;
-        //     Enemy* enemy;
-        // } target;
-        // Player* sprite;
-
-        // explicit Gravity(T* s = NULL, float factor = 1,  int delay = 0); //{ sprite = s; }
-        // ~Gravity() { delete(sprite); }
-
-        // Overloading dereferncing operator
-        // T & operator * () {  return *sprite; }
-
-        // Overloding arrow operator so that members of T can be accessed
-        // like a pointer (useful if T represents a class or struct or
-        // union type)
-        // T * operator -> () { return sprite; }
 
         Gravity(float factor,  int delay);
-        // Gravity(Sprite* s, float factor,  int delay);
-        // Gravity(Player* s, float factor,  int delay);
 
         template <class T>
         void update(T* sprite);
@@ -275,7 +253,13 @@ class Player: public Sprite{
         bool dead;
         string direction;
         string state;
+        string type;
         map< string, array<array<int, SPRITE_SIZE>, FRAMES> > states;
+        struct Absolute{
+            double x;
+            double y;
+        } absolute;
+
         Collider *collider;
         Gravity *gravity;
 
@@ -296,7 +280,9 @@ class Player: public Sprite{
             flip(array<array<int, SPRITE_SIZE>, FRAMES> frames);
         // array<double, 2> position();
         virtual void align();
+        virtual void align(bool horiz);
         virtual void deaded();
+        virtual void bounce(bool start);
 
         void draw(const array<array<int, SPRITE_SIZE>, FRAMES> &data);
         bool collision(Collider complement);
@@ -304,12 +290,13 @@ class Player: public Sprite{
 
 class Enemy: public Sprite{
     public:
-        string type;
         double x;
         double y;
         int width;
         int height;
         int frame;
+        int tier;
+        int bounces;
         bool gravitation;
         bool falling;
         bool bouncing;
@@ -319,8 +306,13 @@ class Enemy: public Sprite{
         Uint32 timestamp;
         string direction;
         string state;
+        string type;
         map< string, array<array<int, SPRITE_SIZE>, FRAMES> > states;
         map<string, array<SDL_Texture*, FRAMES> > cache;
+        struct Absolute{
+            double x;
+            double y;
+        } absolute;
         Collider *collider;
         Gravity *gravity;
 
@@ -339,8 +331,10 @@ class Enemy: public Sprite{
         virtual bool traverse(int direction, double x, double y);
         // array<double, 2> position();
         virtual void align();
+        virtual void align(bool horiz);
         virtual void deaded();
         virtual void draw(const array<array<int, SPRITE_SIZE>, FRAMES> &data){};
+        virtual void bounce(bool start);
 
         void draw(const array<int, SPRITE_SIZE> &bits);
         void compile();
@@ -350,6 +344,10 @@ class Enemy: public Sprite{
         void pursue();
         void decision();
         void walk();
+        void hopoff();
+        void hop(int i);
+        bool aligned();
+        void trampoline();
 };
 
 class Physics{
@@ -359,13 +357,7 @@ class Physics{
                 void check();
         } collision;
 
-        // struct Gravitation{
-        //     Gravity<Player>* player;
-        //     vector< Gravity<Enemy>* > enemies;
-        // } gravitation;
-
         Physics();
-
         Gravity* gravity(float factor,  int delay);
         void bounce();
         void update();

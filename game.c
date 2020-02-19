@@ -8,6 +8,8 @@ Stage::Stage(int w, int h){
     this->bottom = h;
     this->width  = w;
     this->height = h;
+    this->full_width = w+128;
+    this->full_height = h;
 }
 
 Game::Game() : stage(0,0){
@@ -124,6 +126,7 @@ void Game::init(int w, int h){
     Enemy mewkie = * new Enemy();
     mewkie.compile();
     mewkie.init(770, 352);
+    // mewkie.init(580, 352);
     // mewkie.init(580, 480);
     mewkie.gravity = physics.gravity(0.125, 0);
     enemies.push_back(mewkie);
@@ -133,6 +136,7 @@ void Game::init(int w, int h){
     mewkie.init(80, 160);
     // mewkie.init(208, 224);
     mewkie.state = "right";
+    mewkie.gravity = physics.gravity(0.125, 0);
     enemies.push_back(mewkie);
 
 

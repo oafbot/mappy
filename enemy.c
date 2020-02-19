@@ -4,10 +4,18 @@ using namespace std;
 Enemy::Enemy() : Sprite(){
     array <array<int, SPRITE_SIZE>, BITMAP_SIZE> b = data.sprites;
     array<array<int, SPRITE_SIZE>, FRAMES>
-    f0 = {b[26], b[27], b[28], b[27], b[26], b[27], b[28], b[27]}; // left, right
+    f0 = {b[26], b[27], b[28], b[27], b[26], b[27], b[28], b[27]}, // left, right
+    f1 = {b[28], b[28], b[28], b[28], b[28], b[28], b[28], b[28]}, // hop
+    f2 = {b[29], b[29], b[30], b[30], b[29], b[29], b[30], b[30]}, // bounce
+    f3 = {b[31], b[31], b[31], b[31], b[31], b[31], b[31], b[31]}; // ko'ed
 
     define("left", f0);
     define("right", flip(f0));
+    define("hop-left", f1);
+    define("hop-right", flip(f1));
+    define("drop", f2);
+    define("bound", f2);
+    define("dead", f3);
 
     this->width  = DIM;
     this->height = DIM;
@@ -17,6 +25,7 @@ Enemy::Enemy() : Sprite(){
     this->bouncing = false;
     this->direction = "left";
     this->state = "left";
+    this->type = "enemy";
     this->frame = 0;
     this->animated = true;
     // this->dead = false;
@@ -27,7 +36,11 @@ void Enemy::init(double x, double y){
     this->x = x;
     this->y = y;
     this->timestamp = SDL_GetTicks();
-    collider->init(x+game.offset.x, y+game.offset.y, width, height);
+
+    this->absolute.x = x + (game.stage.full_width - game.offset.x);
+    this->absolute.y = y + game.offset.y;
+
+    collider->init(x + game.offset.x, y + game.offset.y, width, height);
 }
 
 void Enemy::draw(const array<int, SPRITE_SIZE> &bits){
@@ -98,45 +111,32 @@ void Enemy::define(string name, array<array<int, SPRITE_SIZE>, FRAMES> frames){
 }
 
 void Enemy::update(){
-    // if(state!="dead" && state!="spin"){
-    //     if(this->falling && !game.controls.key_down){
-    //         this->state = "drop";
-    //     }
-    //     else if(this->bouncing && !game.controls.key_down){
-    //         this->state = "bound";
-    //     }
-    //     else{
-    //         if(this->falling || this->bouncing){
-    //             this->state = this->direction=="left" ? "hop-left" : "hop-right";
-    //         }
-    //         else{
-    //             this->state = this->direction;
-    //         }
-    //     }
-    // }
-    // else if(state=="spin"){
-
-    // }
-
-
-    // if(game.scrolling && (game.offset.x>=64 || game.offset.x<=-128)){
-    //     game.scrolling = false;
-    // }
-    // else if(x>game.center.x-64 && x+width<game.center.x+64){
-    //      game.scrolling = true;
-    // }
-    collider->update(x+game.offset.x, y+game.offset.y);
+    if(state!="dead"){
+        if(this->falling && state!="hop-right" && state!="hop-left"){
+            this->state = "drop";
+        }
+        else if(this->bouncing && state!="hop-right" && state!="hop-left"){
+            this->state = "bound";
+        }
+        // else if(this->falling || this->bouncing){
+        //         this->state = this->direction=="left" ? "hop-left" : "hop-right";
+        // }
+        else if(state!="hop-left" && state!="hop-right"){
+            this->state = this->direction;
+        }
+    }
+    // cout << state << endl;
     walk();
+    collider->update(x+4+game.offset.x, y+game.offset.y);
 }
 
 void Enemy::render(){
     SDL_Rect dest, src;
-    // cout << (player.x + game.offset.x) - (game.offset.x + x) << endl;
-    // cout << game.offset.x - 64 << endl;
-    // cout << x + game.stage.width - (game.center.x - game.offset.x) << endl;
-    // cout << game.offset.x + x + (game.center.x-game.offset.x) << endl;
-    dest.x = game.offset.x + x; //+ (game.center.x-game.offset.x)-game.stage.width; //game.offset.x + x + (192);
+
+    // dest.x = game.center.x + game.stage.width - (1024 - x) + game.offset.x;
+    dest.x = game.offset.x + x;
     dest.y = game.offset.y + y;
+
     dest.w = width*SCALE;
     dest.h = height*SCALE;
 
@@ -185,31 +185,200 @@ bool Enemy::collision(Collider complement){
     return true;
 }
 
-int Enemy::index(double x, double y){ return 0; }
+// int Enemy::index(double x, double y){ return 0; }
 // int Enemy::adjacent(int direction){ return 0; }
-int Enemy::adjacent(int direction, double x, double y){ return 0; }
-bool Enemy::traverse(int direction){ return true; }
-bool Enemy::traverse(int direction, double x, double y){ return true; }
-void Enemy::align(){}
+// int Enemy::adjacent(int direction, double x, double y){ return 0; }
+// bool Enemy::traverse(int direction){ return true; }
+// bool Enemy::traverse(int direction, double x, double y){ return true; }
+// void Enemy::align(){}
 void Enemy::deaded(){}
 
+int Enemy::index(double x, double y){
+    // printf("%f %f\n", x, y);
+    // printf("%f\n", game.offset.x);
+    int tile = BYTE*SCALE;
+    double diff = game.stage.width-(LEVEL_WIDTH*tile);
+    double xpos;
+    xpos = x + (width/2)*SCALE;
+
+    int col = (int)floor(xpos/tile);
+    int row = (int)floor((y+height)/tile);
+    return col + row*LEVEL_WIDTH;
+}
+
+int Enemy::adjacent(int direction, double _x, double _y){
+    int a, shift;
+    // _x = _x==NULL ? x+(width/2)*SCALE  : _x;
+    // _y = _y==NULL ? y+(height/2)*SCALE : _y;
+
+    int i = index(x, y);
+    shift = LEVEL_WIDTH;
+
+    switch(direction){
+        case UP:
+            a = data.interactive[game.level-1][i-shift];
+            break;
+        case DOWN:
+            a = data.interactive[game.level-1][i+shift];
+            break;
+        case RIGHT:
+            a = data.interactive[game.level-1][i+1];
+            break;
+        case LEFT:
+            a = data.interactive[game.level-1][i-1];
+            break;
+    }
+    return a;
+}
+
+bool Enemy::aligned(){
+    int i = index(x,y);
+    int col = i % LEVEL_WIDTH;
+    return col%17==2;
+}
+
+void Enemy::align(){
+    if(((int)y)%LONG!=0){
+        y = (int)(floor(y)/LONG)*LONG;
+    }
+}
+
+void Enemy::align(bool horiz){
+    int i = index(x,y);
+    int col = i % LEVEL_WIDTH;
+
+    if(col%17<2 && col%17!=0){
+        x = ( col + (col%17)-1  )*BYTE*SCALE  + width;
+    }
+    else{
+        // cout << col%17 << endl;
+        x = ( col + 1 - (col%17) )*BYTE*SCALE + width;
+    }
+}
+
+bool Enemy::traverse(int direction){
+    int tile = adjacent(direction, NULL, NULL);
+    if(tile==0){
+        return true;
+    }
+    return false;
+}
+
+bool Enemy::traverse(int direction, double x, double y){
+    int tile = adjacent(direction, x, y);
+    if(tile==0){
+        return true;
+    }
+    return false;
+}
 
 void Enemy::move(){
-    cout << direction << endl;
+    // cout << direction << endl;
+    if(direction=="left"){
+        if(traverse(LEFT)){
+            state = "left";
+            x -= ENEMY_SPEED;
+        }else{
+            state = "right";
+            direction = "right";
+            x += ENEMY_SPEED;
+        }
+    }
+    else if(direction=="right"){
+        if(traverse(RIGHT)){
+            state = "right";
+            x += ENEMY_SPEED;
+        }else{
+            state = "left";
+            direction = "left";
+            x -= ENEMY_SPEED;
+        }
+    }
+}
+
+void Enemy::hop(int i){
+    y = i<25 ? y - 0.25 : y + 0.25;
+    x = direction=="right" ? x + 0.5 : x - 0.5;
+    // if(i>12) falling = false;
+}
+
+void Enemy::hopoff(){
+    bouncing = false;
+    falling = false;
+
+    // gravity->lift = 0;
+    // gravity->speed = 0;
+
+    if(game.delay()){ return; };
+
+    // cout << x << endl;
+    // cout << traverse(DOWN) << endl;
+    if(traverse(DOWN)){
+        if(direction=="left" && traverse(LEFT)){
+            for(int i=0; i<48; i++){
+                hop(i);
+            }
+        }
+        else if(direction=="right" && traverse(RIGHT)){
+            for(int i=0; i<48; i++){
+                hop(i);
+            }
+        }
+    }
+    else{
+        bouncing = false;
+        falling = false;
+        move();
+    }
 }
 
 void Enemy::wander(){
-    int r = rand() % 2;
-    switch(r){
-        case 0:
-            direction = "left";
-            move();
-            break;
-        case 1:
+    int r;
+
+    if(state=="bound" || state=="drop"){
+        if(x<150){
+            state = "hop-right";
             direction = "right";
-            move();
-            break;
+            hopoff();
+        }
+        else if(x>600){
+            state = "hop-left";
+            direction = "left";
+            hopoff();
+        }
+        else{
+            r = rand()%2;
+            switch(r){
+                case 0:
+                    state = "hop-left";
+                    direction = "left";
+                    hopoff();
+                    break;
+                case 1:
+                    state = "hop-right";
+                    direction = "right";
+                    hopoff();
+                    break;
+            }
+        }
     }
+    // else if(state=="drop"){
+
+    // }
+    else{
+        r = rand() % 2;
+        switch(r){
+            case 0:
+                direction = "left";
+                state = "left";
+                break;
+            case 1:
+                direction = "right";
+                state = "right";
+                break;
+        }
+    }
+
 }
 
 void Enemy::pursue(){
@@ -220,11 +389,60 @@ void Enemy::decision(){
 
 }
 
+void Enemy::bounce(bool start=NULL){
+    if(start){
+        trampoline();
+    }
+    else{
+        if(bounces>0){
+            bounces--;
+        }
+    }
+    cout << "floor: " << tier << ", bounces: " << bounces << endl;
+}
+
+void Enemy::trampoline(){
+    tier = rand()%6;
+    bounces = rand()%3;
+}
+
 void Enemy::walk(){
+    if(state!="bound" && state!="drop" && state!="hop-left" && state!="hop-right"){
+        move();
+    }
+    else if(state=="bound"){
+        int r = rand()%6;
+        int row = index(x, y)/LEVEL_HEIGHT;
+        if(r<=row && r%2==0){
+            if(row==10 || (row-10)%4==2){
+                if(rand()%3==0)
+                    wander();
+            }
+        }
+    }
+    else if(state=="drop"){
+        if(direction=="left" && !aligned()){
+             x -= ENEMY_SPEED;
+        }
+        else if(direction=="right" && !aligned()){
+            x += ENEMY_SPEED;
+        }
+    }
+    else if(state=="hop-left" || state=="hop-right"){
+        hopoff();
+    }
+
     if(game.delay(2000, timestamp)){
         return;
     };
-    wander();
+
+    // cout << "bouncing: " << bouncing << endl;
+    // cout << "falling: "  << falling << endl;
+
+    if(state!="bound" && state!="drop" && state!="hop-right" && state!="hop-left"){
+        wander();
+    }
+
     timestamp = SDL_GetTicks();
 }
 

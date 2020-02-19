@@ -57,7 +57,6 @@ void gameloop(){
 }
 
 int main(){
-
     player = * new Player();
     player.init(580, 480);
 

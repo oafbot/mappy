@@ -10,11 +10,15 @@ Player::Player() : Sprite(){
     this->bouncing = false;
     this->direction = "left";
     this->state = "left";
+    this->type = "player";
     this->frame = 0;
     this->dead = false;
     this->repeat = 2;
     this->cycle = 0;
     this->collider = new Collider(this);
+
+    this->absolute.x = x + (game.stage.full_width - game.offset.x);
+    this->absolute.y = y + game.offset.y;
 };
 
 void Player::init(double x, double y){
@@ -71,6 +75,9 @@ void Player::move(){
             // }
         }
     }
+
+    this->absolute.x = x + (game.stage.full_width - game.offset.x);
+    this->absolute.y = y + game.offset.y;
 }
 
 bool Player::traverse(int direction){
@@ -138,6 +145,13 @@ void Player::align(){
         y = (int)(floor(y)/LONG)*LONG;
     }
 }
+
+void Player::align(bool horiz){
+    // if(((int)x)%LONG!=0){
+    //     x = (int)(floor(x)/LONG)*LONG;
+    // }
+}
+
 
 void Player::draw(const array<array<int, SPRITE_SIZE>, FRAMES> &bits){
     string color;
@@ -232,19 +246,23 @@ void Player::update(){
 
     }
 
-    if(game.scrolling && (game.offset.x>=64 || game.offset.x<=-128)){
+    if(game.scrolling && (game.offset.x>=OFFSET || game.offset.x<=-OFFSET*2)){
         game.scrolling = false;
     }
-    else if(x>game.center.x-64 && x+width<game.center.x+64){
+    else if(x>game.center.x-OFFSET && x+width<game.center.x+OFFSET){
          game.scrolling = true;
     }
 
     collider->update(x+4, y);
 
-    for(int i=0; i<game.enemies.size(); i++){
-        if(collision(*game.enemies[i].collider)){
-            deaded();
-            break;
+    if(!bouncing && !falling){
+        for(int i=0; i<game.enemies.size(); i++){
+            if(!game.enemies[i].bouncing && !game.enemies[i].falling){
+                if(collision(*game.enemies[i].collider)){
+                    deaded();
+                    break;
+                }
+            }
         }
     }
 }
@@ -284,4 +302,8 @@ void Player::deaded(){
 bool Player::collision(Collider complement){
     // cout << this->collider->check(complement) << endl;
     return this->collider->check(complement);
+}
+
+void Player::bounce(bool start=NULL){
+
 }

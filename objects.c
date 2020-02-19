@@ -221,7 +221,6 @@ void Trampoline::render(){
     SDL_RenderCopy(renderer, cache[state][frame], &src, &dest);
 }
 
-
 vector< array<array<int, TILE_SIZE>, FRAMES> >
 Trampoline::changeColor(vector< array<array<int, TILE_SIZE>, FRAMES> > grouped, int color){
     vector< array<array<int, TILE_SIZE>, FRAMES> > replace;

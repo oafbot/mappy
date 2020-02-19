@@ -4,15 +4,11 @@ using namespace std;
 Physics::Physics(){}
 
 void Physics::update(){
-    // gravitation.player.update();
     player.gravity->update(&player);
-    for(int i=0; i < game.enemies.size(); i++) {
+
+    for(int i=0; i < game.enemies.size(); i++){
         game.enemies[i].gravity->update(&game.enemies[i]);
     }
-    // cout << gravitation.player->sprite->y <<endl;
-    // for(int i=0; i < gravitation.enemies.size(); i++) {
-    //     gravitation.enemies[i]->update();
-    // }
 }
 
 Gravity* Physics::gravity(float factor,  int delay){
@@ -27,13 +23,6 @@ Gravity::Gravity(float factor,  int delay){
     this->delay = delay ? delay : 0;
     this->min = SCALE;
     this->max = BYTE;
-    // this->type = "player";
-    // this->sprite = s;
-    // this->sprite = unique_ptr<Player>( dynamic_cast<Player*>(s) );
-    // this->sprite = dynamic_cast<Player *>(s);
-    // this->sprite->gravitation = true;
-    // cout << typeid(sprite).name() << endl;
-    // cout << sprite->index(sprite->x, sprite->y) << endl;
 }
 
 template <class T>
@@ -42,9 +31,9 @@ bool Gravity::fallthru(T* sprite){
 
     for(int t=0; t<game.objects["trampoline"].size(); t++){
         vector<int> group = game.objects["trampoline"][t].group;
-        // When the element is not found, std::find returns the end of the range
+
         if(find(begin(group), end(group), index) != end(group)){
-            if(game.objects["trampoline"][t].bounces>=BOUNCES){
+            if(game.objects["trampoline"][t].bounces>=BOUNCES && sprite->type=="player"){
                 speed = 0.5;
                 sprite->frame = 0;
                 sprite->state = "spin";
@@ -53,7 +42,6 @@ bool Gravity::fallthru(T* sprite){
             }
         }
     }
-    // cout << sprite->x << " " << sprite->y << " " << speed << " " <<  gravity <<endl;
     return sprite->traverse(DOWN, sprite->x, sprite->y + speed + gravity);
 }
 
@@ -83,11 +71,13 @@ void Gravity::update(T* sprite){
         else{
             if(!sprite->bouncing){
                 sprite->align();
-                for(int t=0; t<game.objects["trampoline"].size(); t++){
-                    game.objects["trampoline"][t].reset();
-                    game.objects["trampoline"][t].bounces = 0;
-                    game.objects["trampoline"][t].state = "green";
-                    game.objects["trampoline"][t].active = false;
+                if(sprite->type=="player"){
+                    for(int t=0; t<game.objects["trampoline"].size(); t++){
+                        game.objects["trampoline"][t].reset();
+                        game.objects["trampoline"][t].bounces = 0;
+                        game.objects["trampoline"][t].state = "green";
+                        game.objects["trampoline"][t].active = false;
+                    }
                 }
             }
             sprite->falling = false;
@@ -96,21 +86,16 @@ void Gravity::update(T* sprite){
 
         tile = sprite->adjacent(DOWN, sprite->x, sprite->y);
 
-        // if(tile != 0){
-        //     cout << tile << endl;
-        // }
-
         if(tile==2){
             index = sprite->index(sprite->x, sprite->y)+LEVEL_WIDTH;
 
             for(int t=0; t<game.objects["trampoline"].size(); t++){
                 group = game.objects["trampoline"][t].group;
-                // When the element is not found, std::find returns the end of the range
+
                 if(find(begin(group), end(group), index) != end(group)){
-                    //cout << distance(group, find(begin(group), end(group), index)) << endl;
                     game.objects["trampoline"][t].frame = 0;
                     game.objects["trampoline"][t].animated = true;
-                    // cout << game.objects["trampoline"][t].bounces << endl;
+
                     if(game.objects["trampoline"][t].bounces<BOUNCES && !game.objects["trampoline"][t].active){
                         game.objects["trampoline"][t].active = true;
                         bound(sprite);
@@ -118,6 +103,7 @@ void Gravity::update(T* sprite){
                     else if(game.objects["trampoline"][t].active){
                         // cout << "active" << endl;
                         // pass
+                        sprite->bounce();
                     }
                     else{
                         sprite->deaded();
@@ -146,7 +132,6 @@ void Gravity::update(T* sprite){
     }
 }
 
-
 void Gravity::reset(){
     this->speed = 0;
 }
@@ -156,9 +141,16 @@ void Gravity::bound(T* sprite){
     sprite->falling = false;
     sprite->bouncing = true;
 
+    if(sprite->type=="player")
+        cout << sprite->x << endl;
+
+    sprite->align(true);
+    sprite->bounce(true);
+
     if(lift==0){
         lift = max*3;
     }
+
     // else{
     //     lift = lift>min ? lift - gravity : min;
     // }
@@ -182,6 +174,9 @@ void Collider::update(double x, double y){
 }
 
 bool Collider::check(Collider collider){
+    // if(object->bouncing || object->falling || collider.object->falling || collider.object->bouncing){
+    //     return false;
+    // }
     double ax0 = x,
            ax1 = x + width,
            ay0 = y,
