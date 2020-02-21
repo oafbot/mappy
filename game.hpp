@@ -21,8 +21,8 @@ using namespace std;
 #define FRAME_COUNT 7
 #define SCALE 2
 #define DIM 16
-#define SPEED 2
-#define ENEMY_SPEED 1.2
+#define SPEED 1.5
+#define ENEMY_SPEED 1.25
 #define BYTE 8
 #define WORD 16
 #define LONG 32
@@ -30,6 +30,10 @@ using namespace std;
 #define RIGHT 1
 #define DOWN 2
 #define LEFT 3
+#define UP_RIGHT 4
+#define DOWN_RIGHT 5
+#define DOWN_LEFT 6
+#define UP_LEFT 7
 #define OFFSET 64
 #define FRAMES 8
 #define BOUNCES 3
@@ -39,6 +43,17 @@ using namespace std;
 #define LEVEL_WIDTH 56
 #define LEVEL_HEIGHT 36
 #define LEVEL_SIZE LEVEL_WIDTH*LEVEL_HEIGHT //2016
+#define TRAMPOLINE 2
+#define DOOR_LEFT 3
+#define DOOR_RIGHT 4
+#define MAGIC_DOOR_L 5
+#define MAGIC_DOOR_R 6
+#define RADIO 7
+#define TV 8
+#define COMPUTER 9
+#define PAINTING 10
+#define SAFE 11
+#define BELL 12
 
 extern Uint32 last_time;
 extern Uint32 last_frame_time;
@@ -61,6 +76,9 @@ struct Data{
     array <array<int, TILE_SIZE>,   BITMAP_SIZE> tiles;
     array <array<int, LEVEL_SIZE>, 16> levels;
     array <array<int, LEVEL_SIZE>, 16> interactive;
+    array <array<int, SPRITE_SIZE>, 6> items;
+    array <int, 12> enemies;
+    array <array<int, 2>, 10> spawn;
 };
 
 struct Coordinates{
@@ -120,6 +138,7 @@ class Sprite{
         bool falling;
         bool bouncing;
         bool dead;
+        bool passthru;
 
         string direction;
         string state;
@@ -139,12 +158,14 @@ class Sprite{
         virtual void draw(const array<array<int, SPRITE_SIZE>, FRAMES> &data) = 0;
         virtual void define(string name, array<array<int, SPRITE_SIZE>, FRAMES> frames) = 0;
         virtual int  index(double x, double y) = 0;
+        virtual int  adjacent(int direction) = 0;
         virtual int  adjacent(int direction, double x, double y) = 0;
         virtual bool traverse(int direction) = 0;
         virtual bool traverse(int direction, double x, double y) = 0;
         virtual void align()  = 0;
         virtual void deaded() = 0;
         virtual void bounce() = 0;
+        virtual void ledge()  = 0;
         virtual array<array<int, SPRITE_SIZE>, FRAMES>
             flip(array<array<int, SPRITE_SIZE>, FRAMES> frames) = 0;
         // array<double, 2> position();
@@ -203,18 +224,54 @@ class Trampoline: public GameObject{
         changeColor(vector< array<array<int, TILE_SIZE>, FRAMES> > grouped, int color);
 };
 
+class Door: public GameObject{
+    public:
+        string state;
+        string type;
+        bool   open;
+
+        Door();
+        void init();
+        void assign(int index);
+        void reset();
+        void render();
+};
+
+class Item: public GameObject{
+    public:
+        int  id;
+        int  points;
+        bool collected;
+
+        string state;
+        string type;
+
+        SDL_Texture* cache;
+
+        Item(int id);
+        void init();
+        void assign(int index);
+        void reset();
+        void compile();
+        void draw(const array<int, SPRITE_SIZE> &bits);
+        void render();
+        void collect();
+};
+
+template <class T>
 class Collider{
     public:
         int width;
         int height;
         double x;
         double y;
-        Sprite* object;
+        T* object;
 
-    Collider(Sprite* obj);
+    Collider(T* obj);
     void init(double x, double y, int w, int h);
     void update(double x, double y);
-    bool check(Collider collider);
+    template <class T2>
+    bool check(Collider<T2> collider);
 };
 
 class Gravity{
@@ -253,6 +310,7 @@ class Player: public Sprite{
         bool falling;
         bool bouncing;
         bool dead;
+        bool passthru;
         string direction;
         string state;
         string type;
@@ -262,7 +320,7 @@ class Player: public Sprite{
             double y;
         } absolute;
 
-        Collider *collider;
+        Collider<Player> *collider;
         Gravity *gravity;
 
         Player();
@@ -275,6 +333,7 @@ class Player: public Sprite{
         virtual void render();
         virtual void define(string name, array<array<int, SPRITE_SIZE>, FRAMES> frames);
         virtual int  index(double x, double y);
+        virtual int  adjacent(int direction);
         virtual int  adjacent(int direction, double x, double y);
         virtual bool traverse(int direction);
         virtual bool traverse(int direction, double x, double y);
@@ -285,9 +344,12 @@ class Player: public Sprite{
         virtual void align(bool horiz);
         virtual void deaded();
         virtual void bounce();
+        virtual void ledge();
 
         void draw(const array<array<int, SPRITE_SIZE>, FRAMES> &data);
-        bool collision(Collider complement);
+        template <class T>
+        bool collision(Collider<T> complement);
+        void collect();
 };
 
 class Enemy: public Sprite{
@@ -304,6 +366,7 @@ class Enemy: public Sprite{
         bool bouncing;
         bool ko;
         bool animated;
+        bool passthru;
         // Uint32 current;
         Uint32 timestamp;
         string direction;
@@ -316,7 +379,7 @@ class Enemy: public Sprite{
             double x;
             double y;
         } absolute;
-        Collider *collider;
+        Collider<Enemy> *collider;
         Gravity *gravity;
 
         Enemy();
@@ -329,6 +392,7 @@ class Enemy: public Sprite{
             flip(array<array<int, SPRITE_SIZE>, FRAMES> frames);
         virtual void define(string name, array<array<int, SPRITE_SIZE>, FRAMES> frames);
         virtual int index(double x, double y);
+        virtual int adjacent(int direction);
         virtual int adjacent(int direction, double x, double y);
         virtual bool traverse(int direction);
         virtual bool traverse(int direction, double x, double y);
@@ -338,11 +402,12 @@ class Enemy: public Sprite{
         virtual void deaded();
         virtual void draw(const array<array<int, SPRITE_SIZE>, FRAMES> &data){};
         virtual void bounce();
+        virtual void ledge();
 
         void draw(const array<int, SPRITE_SIZE> &bits);
         void compile();
         void koed();
-        bool collision(Collider complement);
+        bool collision(Collider<Player> complement);
         void wander();
         void pursue();
         void decision();
@@ -385,10 +450,16 @@ class Game{
         bool scrolling;
         int  level;
         int  tiers;
+        int  score;
+        int  hiscore;
+        int  pickup;
+        int  factor;
+
         struct Center{
             double x;
             double y;
         } center;
+
         struct Offset{
             double x;
             double y;
@@ -397,7 +468,9 @@ class Game{
         Control controls;
         Stage stage;
         Mapper mapper;
+        vector<int>   skip;
         vector<Enemy> enemies;
+        vector<Item>  items;
         map< string, vector<Trampoline> > objects;
         // Timer timer;
 
@@ -412,7 +485,9 @@ class Game{
         int trampoline();
 };
 
-
+// *************
+//    helpers
+// *************
 
 SDL_Color hex2sdl(std::string input) {
     if (input[0] == '#')
@@ -428,6 +503,12 @@ SDL_Color hex2sdl(std::string input) {
     color.b = (value >> 0) & 0xff;
     return color;
 }
+
+template <typename T>
+bool contains(vector<T> haystack, T needle){
+    return find(begin(haystack), end(haystack), needle)!=end(haystack);
+}
+
 
 extern Game    game;
 extern Physics physics;

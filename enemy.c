@@ -29,8 +29,11 @@ Enemy::Enemy() : Sprite(){
     this->frame = 0;
     this->animated = true;
     // this->dead = false;
-    this->collider = new Collider(this);
+    this->collider = new Collider<Enemy>(this);
     this->bounces = -1;
+    this->passthru = false;
+
+    this->compile();
 };
 
 void Enemy::init(double x, double y){
@@ -115,19 +118,27 @@ void Enemy::update(){
     if(state!="dead"){
         if(this->falling && state!="hop-right" && state!="hop-left"){
             this->state = "drop";
+            this->passthru = true;
         }
         else if(this->bouncing && state!="hop-right" && state!="hop-left"){
             this->state = "bound";
+            this->passthru = true;
         }
-        // else if(this->falling || this->bouncing){
-        //         this->state = this->direction=="left" ? "hop-left" : "hop-right";
-        // }
+        else if(this->falling || this->bouncing){
+                // this->state = this->direction=="left" ? "hop-left" : "hop-right";
+            this->passthru = true;
+        }
+        else if(state=="hop-left" && state=="hop-right"){
+            this->passthru = true;
+        }
         else if(state!="hop-left" && state!="hop-right"){
             this->state = this->direction;
+            this->passthru = false;
         }
     }
     // cout << state << endl;
     walk();
+
     collider->update(x+4+game.offset.x, y+game.offset.y);
 }
 
@@ -181,18 +192,18 @@ void Enemy::compile(){
     SDL_SetRenderTarget(renderer, NULL);
 }
 
-bool Enemy::collision(Collider complement){
+bool Enemy::collision(Collider<Player> complement){
 
     return true;
 }
 
-// int Enemy::index(double x, double y){ return 0; }
-// int Enemy::adjacent(int direction){ return 0; }
-// int Enemy::adjacent(int direction, double x, double y){ return 0; }
-// bool Enemy::traverse(int direction){ return true; }
-// bool Enemy::traverse(int direction, double x, double y){ return true; }
-// void Enemy::align(){}
 void Enemy::deaded(){}
+
+void Enemy::ledge(){
+    if(adjacent(DOWN_LEFT)==0 || adjacent(DOWN_RIGHT)==0){
+        this->passthru = true;
+    }
+}
 
 int Enemy::index(double x, double y){
     // printf("%f %f\n", x, y);
@@ -207,10 +218,8 @@ int Enemy::index(double x, double y){
     return col + row*LEVEL_WIDTH;
 }
 
-int Enemy::adjacent(int direction, double _x, double _y){
+int Enemy::adjacent(int direction){
     int a, shift;
-    // _x = _x==NULL ? x+(width/2)*SCALE  : _x;
-    // _y = _y==NULL ? y+(height/2)*SCALE : _y;
 
     int i = index(x, y);
     shift = LEVEL_WIDTH;
@@ -227,6 +236,41 @@ int Enemy::adjacent(int direction, double _x, double _y){
             break;
         case LEFT:
             a = data.interactive[game.level-1][i-1];
+            break;
+        case DOWN_LEFT:
+            a = data.interactive[game.level-1][i-1+shift];
+            break;
+        case DOWN_RIGHT:
+            a = data.interactive[game.level-1][i+1+shift];
+            break;
+    }
+    return a;
+}
+
+int Enemy::adjacent(int direction, double _x, double _y){
+    int a, shift;
+
+    int i = index(_x, _y);
+    shift = LEVEL_WIDTH;
+
+    switch(direction){
+        case UP:
+            a = data.interactive[game.level-1][i-shift];
+            break;
+        case DOWN:
+            a = data.interactive[game.level-1][i+shift];
+            break;
+        case RIGHT:
+            a = data.interactive[game.level-1][i+1];
+            break;
+        case LEFT:
+            a = data.interactive[game.level-1][i-1];
+            break;
+        case DOWN_LEFT:
+            a = data.interactive[game.level-1][i-1+shift];
+            break;
+        case DOWN_RIGHT:
+            a = data.interactive[game.level-1][i+1+shift];
             break;
     }
     return a;
@@ -258,8 +302,11 @@ void Enemy::align(bool horiz){
 }
 
 bool Enemy::traverse(int direction){
-    int tile = adjacent(direction, NULL, NULL);
+    int tile = adjacent(direction);
     if(tile==0){
+        return true;
+    }
+    if(tile>6 && tile<13){
         return true;
     }
     return false;
@@ -270,11 +317,15 @@ bool Enemy::traverse(int direction, double x, double y){
     if(tile==0){
         return true;
     }
+    if(tile>6 && tile<13){
+        return true;
+    }
     return false;
 }
 
 void Enemy::move(){
     // cout << direction << endl;
+
     if(direction=="left"){
         if(traverse(LEFT)){
             state = "left";
@@ -300,11 +351,13 @@ void Enemy::move(){
 void Enemy::hop(int i){
     y = i<25 ? y - 0.25 : y + 0.25;
     x = direction=="right" ? x + 0.25 : x - 0.25;
+    passthru = true;
 }
 
 void Enemy::hopoff(){
     bouncing = false;
     falling = false;
+    passthru = true;
 
     if(game.delay()){ return; };
 
@@ -358,28 +411,42 @@ void Enemy::wander(){
             }
         }
     }
-    // else{
-    //     r = rand() % 2;
-    //     switch(r){
-    //         case 0:
-    //             direction = "left";
-    //             state = "left";
-    //             break;
-    //         case 1:
-    //             direction = "right";
-    //             state = "right";
-    //             break;
-    //     }
-    // }
+    else{
+        r = rand() % 2;
+        switch(r){
+            case 0:
+                direction = "left";
+                state = "left";
+                break;
+            case 1:
+                direction = "right";
+                state = "right";
+                break;
+        }
+    }
 
 }
 
 void Enemy::pursue(){
-
+    if(player.x < x){
+        direction = "left";
+        state = "left";
+    }
+    else if(player.x >= x){
+        direction = "right";
+        state = "right";
+    }
 }
 
 void Enemy::decision(){
-    wander();
+    int r = rand()%3;
+
+    if(r && player.state!="drop" && player.state!="bound"){
+        pursue();
+    }
+    else{
+        wander();
+    }
 }
 
 void Enemy::bounce(){
@@ -400,8 +467,21 @@ void Enemy::bounce(){
 void Enemy::trampoline(){
     int row = index(x, y)/LEVEL_HEIGHT;
     int pos = game.tiers-((row-10)/game.tiers);
+    int plyr = player.index(player.x, player.y)/LEVEL_HEIGHT;
+    // cout<< row << " " << plyr <<endl;
+        if(row==plyr){
+            if(player.x < x){
+            direction = "left";
+            state = "hop-left";
+        }
+        else if(player.x >= x){
+            direction = "right";
+            state = "hop-right";
+        }
+        hopoff();
+    }
 
-    if(pos==tier && bounces<=0){
+    else if(pos==tier && bounces<=0){
         wander();
     }
 }
@@ -438,4 +518,3 @@ void Enemy::walk(){
 
     timestamp = SDL_GetTicks();
 }
-

@@ -15,8 +15,9 @@ Player::Player() : Sprite(){
     this->dead = false;
     this->repeat = 2;
     this->cycle = 0;
-    this->collider = new Collider(this);
+    this->collider = new Collider<Player>(this);
     this->bounces = 0;
+    this->passthru = false;
 
     this->absolute.x = x + (game.stage.full_width - game.offset.x);
     this->absolute.y = y + game.offset.y;
@@ -82,8 +83,11 @@ void Player::move(){
 }
 
 bool Player::traverse(int direction){
-    int tile = adjacent(direction, NULL, NULL);
+    int tile = adjacent(direction);
     if(tile==0){
+        return true;
+    }
+    if(tile>6 && tile<13){
         return true;
     }
     return false;
@@ -94,7 +98,27 @@ bool Player::traverse(int direction, double x, double y){
     if(tile==0){
         return true;
     }
+    if(tile>6 && tile<13){
+        return true;
+    }
     return false;
+}
+
+void Player::ledge(){
+    if(adjacent(DOWN_LEFT)!=1 || adjacent(DOWN_RIGHT)!=1){
+        // cout << "true" << endl;
+        this->passthru = true;
+    }
+    else{
+        // cout << "false" << endl;
+        this->passthru = false;
+    }
+    // if(direction=="left" && adjacent(DOWN_LEFT)==0){
+    //     return true;
+    // }
+    // else if(direction=="right" && adjacent(DOWN_RIGHT)==0){
+    //     return true;
+    // }
 }
 
 // array<double, 2>
@@ -116,10 +140,8 @@ int Player::index(double x, double y){
     return col + row*LEVEL_WIDTH;
 }
 
-int Player::adjacent(int direction, double _x, double _y){
+int Player::adjacent(int direction){
     int a, shift;
-    _x = _x==NULL ? x+(width/2)*SCALE - game.offset.x : _x;
-    _y = _y==NULL ? y+(height/2)*SCALE - game.offset.y: _y;
 
     int i = index(x, y);
     shift = LEVEL_WIDTH;
@@ -136,6 +158,41 @@ int Player::adjacent(int direction, double _x, double _y){
             break;
         case LEFT:
             a = data.interactive[game.level-1][i-1];
+            break;
+        case DOWN_LEFT:
+            a = data.interactive[game.level-1][i-1+shift];
+            break;
+        case DOWN_RIGHT:
+            a = data.interactive[game.level-1][i+1+shift];
+            break;
+    }
+    return a;
+}
+
+int Player::adjacent(int direction, double _x, double _y){
+    int a, shift;
+
+    int i = index(_x, _y);
+    shift = LEVEL_WIDTH;
+
+    switch(direction){
+        case UP:
+            a = data.interactive[game.level-1][i-shift];
+            break;
+        case DOWN:
+            a = data.interactive[game.level-1][i+shift];
+            break;
+        case RIGHT:
+            a = data.interactive[game.level-1][i+1];
+            break;
+        case LEFT:
+            a = data.interactive[game.level-1][i-1];
+            break;
+        case DOWN_LEFT:
+            a = data.interactive[game.level-1][i-1+shift];
+            break;
+        case DOWN_RIGHT:
+            a = data.interactive[game.level-1][i+1+shift];
             break;
     }
     return a;
@@ -225,6 +282,7 @@ void Player::update(){
     if(state!="dead" && state!="spin"){
         if(this->falling && !game.controls.key_down){
             this->state = "drop";
+            this->passthru = true;
         }
         else if(this->bouncing && !game.controls.key_down){
             if(this->y<300){
@@ -232,14 +290,17 @@ void Player::update(){
             }else{
                 this->state = "bound";
             }
+            this->passthru = true;
         }
         else{
             if(this->falling || this->bouncing){
                 // if(state!="turn")
                 this->state = this->direction=="left" ? "hop-left" : "hop-right";
+                this->passthru = true;
             }
             else{
                 this->state = this->direction;
+                this->passthru = false;
             }
         }
     }
@@ -254,15 +315,31 @@ void Player::update(){
          game.scrolling = true;
     }
 
+    ledge();
     collider->update(x+4, y);
+
+    collect();
 
     if(!bouncing && !falling){
         for(int i=0; i<game.enemies.size(); i++){
             if(!game.enemies[i].bouncing && !game.enemies[i].falling){
-                if(collision(*game.enemies[i].collider)){
+                if(!passthru && collision(*game.enemies[i].collider)){
                     deaded();
                     break;
                 }
+            }
+        }
+    }
+}
+
+void Player::collect(){
+    int pos = index(x, y);
+    int tile = data.interactive[game.level-1][pos];
+
+    if(tile>6 && tile<13){
+        for(int i=0; i<game.items.size(); i++){
+            if(contains(game.items[i].group, pos) && !game.items[i].collected){
+                game.items[i].collect();
             }
         }
     }
@@ -300,7 +377,8 @@ void Player::deaded(){
     }
 }
 
-bool Player::collision(Collider complement){
+template <class T>
+bool Player::collision(Collider<T> complement){
     // cout << this->collider->check(complement) << endl;
     return this->collider->check(complement);
 }

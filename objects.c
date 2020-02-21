@@ -139,6 +139,8 @@ void GameObject::render(){
     SDL_RenderCopy(renderer, cache[state][frame], &src, &dest);
 }
 
+
+
 Trampoline::Trampoline(){
     this->state = "green";
     this->frame = 5;
@@ -175,6 +177,8 @@ Trampoline::Trampoline(){
     define("orange", changeColor(g, 29));
     define("red",    changeColor(g, 30));
     define("broken", changeColor(g, 0));
+
+    this->compile();
 }
 
 void Trampoline::assign(int index){
@@ -236,14 +240,11 @@ Trampoline::changeColor(vector< array<array<int, TILE_SIZE>, FRAMES> > grouped, 
 
 void Trampoline::init(){
     int col, row;
-    for(int i=0; i<group.size(); i++){
-        if(i==0){
-            col = group[i] % LEVEL_WIDTH;
-            row = floor(group[i] / LEVEL_WIDTH);
-            this->x = col*BYTE*SCALE;
-            this->y = (row-1)*BYTE*SCALE;
-        }
-    }
+
+    col = group[0] % LEVEL_WIDTH;
+    row = floor(group[0] / LEVEL_WIDTH);
+    this->x = col*BYTE*SCALE;
+    this->y = (row-1)*BYTE*SCALE;
 }
 
 void Trampoline::reset(){
@@ -278,3 +279,128 @@ void Trampoline::bounce(){
 
     active = false;
 }
+
+
+
+Item::Item(int id){
+    this->id = id;
+    this->state = "closed";
+    this->width  = DIM;
+    this->height = DIM;
+    this->collected = false;
+    this->compile();
+
+    switch(id+7){
+        case RADIO:
+            type = "radio";
+            points = 100;
+            break;
+        case TV:
+            type = "tv";
+            points = 200;
+            break;
+        case COMPUTER:
+            type = "computer";
+            points = 300;
+            break;
+        case PAINTING:
+            type = "painting";
+            points = 400;
+            break;
+        case SAFE:
+            type = "safe";
+            points = 500;
+            break;
+    }
+}
+
+void Item::init(){
+    int col, row;
+    col = group[0] % LEVEL_WIDTH;
+    row = floor(group[0] / LEVEL_WIDTH);
+    this->x = col*BYTE*SCALE;
+    this->y = (row-1)*BYTE*SCALE;
+}
+
+void Item::assign(int index){
+    group.push_back(index);
+    group.push_back(index+1);
+    group.push_back(index+LEVEL_WIDTH);
+    group.push_back(index+LEVEL_WIDTH+1);
+    init();
+}
+
+void Item::compile(){
+    SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width*SCALE, height*SCALE);
+    SDL_SetRenderTarget(renderer, texture);
+
+    draw(data.items[id]);
+
+    this->cache = texture;
+    SDL_SetRenderTarget(renderer, NULL);
+}
+
+void Item::draw(const array<int, SPRITE_SIZE> &bits){
+    string color;
+    SDL_Rect r;
+
+    int w = SCALE;
+    int row;
+    int col;
+    int bit;
+    int alpha = 255;
+
+    for(int i=0; i<SPRITE_SIZE; i++) {
+        bit = bits[i];
+        if(bit){
+            color = data.palette[bit];
+            SDL_Color c = hex2sdl(color);
+
+            col = i % DIM;
+            row = floor(i / DIM);
+
+            r.x = w*col;
+            r.y = w*row;
+            r.w = w;
+            r.h = w;
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, alpha);
+            SDL_RenderFillRect(renderer, &r);
+        }
+    }
+}
+
+void Item::render(){
+    if(!collected){
+        SDL_Rect dest, src;
+        dest.x = game.offset.x + x;
+        dest.y = game.offset.y + y + WORD;
+        dest.w = width*SCALE;
+        dest.h = height*SCALE;
+
+        src.x = 0;
+        src.y = 0;
+        src.w = width*SCALE;
+        src.h = height*SCALE;
+        SDL_SetTextureBlendMode(cache, SDL_BLENDMODE_BLEND);
+        SDL_RenderCopy(renderer, cache, &src, &dest);
+    }
+}
+
+void Item::collect(){
+    collected = true;
+
+    if(game.pickup==id){
+        cout << "bonus " << points << "x" << game.factor << endl;
+        game.score += points*game.factor;
+        game.factor += 1;
+    }
+    else{
+        game.score += points;
+    }
+    game.pickup = id;
+
+    cout<< "score: " << game.score << endl;
+}
+
+void Item::reset(){}

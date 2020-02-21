@@ -56,6 +56,8 @@ void Control::input(){
                         //     player.state = "down";
                         // }
                         break;
+                    case SDLK_SPACE:
+                        game.PAUSED = !game.PAUSED;
                     default:
                         // key_down = false;
                         break;

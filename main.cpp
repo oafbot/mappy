@@ -52,8 +52,11 @@ void init(){
 
 void gameloop(){
     game.controls.input();
-    game.update();
-    game.render();
+
+    if(!game.PAUSED){
+        game.update();
+        game.render();
+    }
 }
 
 int main(){

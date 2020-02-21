@@ -43,7 +43,7 @@ bool Gravity::fallthru(T* sprite){
             }
         }
     }
-    return sprite->traverse(DOWN, sprite->x, sprite->y + speed + gravity);
+    return sprite->traverse(DOWN);
 }
 
 template <class T>
@@ -83,14 +83,13 @@ void Gravity::update(T* sprite){
                         game.objects["trampoline"][t].active  = false;
                         game.objects["trampoline"][t].jumper  = "";
                     }
-                    // sprite->bounces = 0;
                 }
             }
             sprite->falling = false;
             speed = 0;
         }
 
-        tile = sprite->adjacent(DOWN, sprite->x, sprite->y);
+        tile = sprite->adjacent(DOWN);
 
         if(tile==2){
             // Bouncing
@@ -100,14 +99,11 @@ void Gravity::update(T* sprite){
                 group = game.objects["trampoline"][t].group;
 
                 if(find(begin(group), end(group), index) != end(group)){
-
                     game.objects["trampoline"][t].frame = 0;
                     game.objects["trampoline"][t].animated = true;
-
                     game.objects["trampoline"][t].jumper = sprite->type;
 
                     if(game.objects["trampoline"][t].bounces<BOUNCES && !game.objects["trampoline"][t].active){
-                        // game.objects["trampoline"][t].bounce();
                         game.objects["trampoline"][t].active = true;
                         bound(sprite);
                     }
@@ -122,9 +118,7 @@ void Gravity::update(T* sprite){
                         game.objects["trampoline"][t].active = true;
                         bound(sprite);
                     }
-                }
-                else{
-                    // Not found
+
                 }
             }
         }
@@ -134,7 +128,7 @@ void Gravity::update(T* sprite){
 
             sprite->y -= lift;
 
-            tile = sprite->adjacent(UP, sprite->x, sprite->y);
+            tile = sprite->adjacent(UP);
 
             if(tile!=0){
                 lift = 0;
@@ -155,8 +149,7 @@ void Gravity::bound(T* sprite){
     sprite->falling = false;
     sprite->bouncing = true;
 
-    if(sprite->type=="player")
-        cout << sprite->x << endl;
+    // if(sprite->type=="player") cout << sprite->x << endl;
 
     sprite->align(true);
     sprite->bounce();
@@ -164,33 +157,41 @@ void Gravity::bound(T* sprite){
     if(lift==0){
         lift = max*2;
     }
-
-    // else{
-    //     lift = lift>min ? lift - gravity : min;
-    // }
 };
 
 
-Collider::Collider(Sprite* obj){
+template <class T>
+Collider<T>::Collider(T* obj){
     this->object = obj;
 }
 
-void Collider::init(double x, double y, int w, int h){
+template <class T>
+void Collider<T>::init(double x, double y, int w, int h){
     this->x = x;
     this->y = y;
     this->width  = w*SCALE;
     this->height = h*SCALE;
 }
 
-void Collider::update(double x, double y){
-    this->x = x;//ffset ? this->object->x+game.offset.x : this->object->x;
-    this->y = y;//offset ? this->object->y+game.offset.y : this->object->y;
+template <class T>
+void Collider<T>::update(double x, double y){
+    this->x = x;
+    this->y = y;
+    // this->object->ledge();
 }
 
-bool Collider::check(Collider collider){
-    // if(object->bouncing || object->falling || collider.object->falling || collider.object->bouncing){
-    //     return false;
-    // }
+template <class T>
+template <class T2>
+bool Collider<T>::check(Collider<T2> collider){
+    if(object->state=="hop-right" || collider.object->state=="hop-right" ||
+       object->state=="hop-left"  || collider.object->state=="hop-left"  ||
+       object->falling            || collider.object->falling            ||
+       object->bouncing           || collider.object->bouncing           ||
+       object->passthru           || collider.object->passthru           ){
+        return false;
+    }
+
+    // cout << object->passthru << collider.object->passthru<<endl;
     double ax0 = x,
            ax1 = x + width,
            ay0 = y,

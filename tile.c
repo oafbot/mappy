@@ -15,9 +15,6 @@ void Mapper::compile(int level){
     int row;
     SDL_Texture *texture;
 
-    // printf("Loading stage %d\n", level+1);
-    // printf("%s\n", this->state.c_str());
-
     texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET,
                                 LEVEL_WIDTH*BYTE*SCALE, LEVEL_HEIGHT*BYTE*SCALE);
     SDL_SetRenderTarget(renderer, texture);
