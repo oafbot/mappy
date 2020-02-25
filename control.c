@@ -66,7 +66,7 @@ void Control::input(){
                             game.start();
                         }
                         else{
-                            game.PAUSED = !game.PAUSED;
+                            game.pause();
                         }
                         break;
                     case SDLK_ESCAPE:

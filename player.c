@@ -408,6 +408,8 @@ void Player::deaded(){
         game.controls.lock = true;
         game.lives -= 1;
         timestamp = SDL_GetTicks();
+        game.sound.music.stop();
+        game.sound.effects.play("dead");
     }
 }
 

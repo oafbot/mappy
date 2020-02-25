@@ -27,6 +27,7 @@ Game::Game() : stage(0,0){
     this->lives     = 3;
     this->mapper    = * new Mapper();
     this->controls  = * new Control();
+    this->sound     = * new Sound();
     this->controls.lock = false;
     this->state="START_SCREEN";
 }
@@ -41,7 +42,6 @@ void Game::update(){
     }
 
     if(collected.size()==10){
-        COMPLETE = true;
         complete();
     }
 }
@@ -168,14 +168,18 @@ void Game::setup(){
 }
 
 void Game::start(){
-    if( Mix_OpenAudio( 44100, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 1024 ) < 0 ){
-        printf( "SDL_mixer could not initialize! SDL_mixer Error: %s\n", Mix_GetError() );
-        exit(2);
-    }
+    // Mix_Music *music;
+    // sounds["theme"] = Mix_LoadMUS("audio/theme.wav");
+    // Mix_PlayMusic(sounds["theme"], -1);
+    sound.init();
+    sound.music.load("theme", AUDIO_THEME);
+    sound.effects.load("tampoline", AUDIO_JUMP);
+    sound.effects.load("dead", AUDIO_DEAD);
+    sound.effects.load("clear", AUDIO_CLEAR);
+    sound.effects.load("item", AUDIO_ITEM);
 
-    Mix_Music *music;
-    music = Mix_LoadMUS("audio/theme.wav");
-    Mix_PlayMusic(music, -1);
+    sound.music.loop("theme");
+
     // sounds["theme"] = new Audio(THEME, false);
     // device_id = SDL_OpenAudioDevice(NULL, 0, &(sounds["theme"]->spec), NULL, 0);
 
@@ -184,7 +188,6 @@ void Game::start(){
     // }
     // SDL_PauseAudioDevice(device_id, 0);
     // sounds["theme"]->play();
-
     this->PAUSED = false;
     this->state="RUNNING";
 }
@@ -238,12 +241,27 @@ int Game::trampoline(){
     return -1;
 }
 
+void Game::pause(){
+    PAUSED = !PAUSED;
+    if(PAUSED)
+        sound.music.pause();
+    else
+        game.sound.music.resume();
+}
+
 void Game::clear(){
     SDL_SetRenderDrawColor( renderer, 0, 0, 0, 255 );
     SDL_RenderClear( renderer );
 }
 
 void Game::complete(){
+    sound.music.stop();
+
+    if(!COMPLETE)
+        sound.effects.play("clear");
+
+    COMPLETE = true;
+
     if(game.delay(2000, timestamp)){
         return;
     }
@@ -284,6 +302,8 @@ void Game::restage(){
     player.reset(580, 480);
     controls.lock = false;
 
+    game.sound.music.loop("theme");
+
     this->PAUSED    = false;
     this->RESET     = false;
     this->COMPLETE  = false;
@@ -309,6 +329,8 @@ void Game::restart(){
     for(int t=0; t<trampolines.size(); t++){
         trampolines[t].reset();
     }
+
+    game.sound.music.loop("theme");
 }
 
 void Game::reset(){

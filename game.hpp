@@ -62,7 +62,11 @@ using namespace std;
 #define SAFE 11
 #define BELL 12
 
-#define THEME (char*)"/audio/theme.wav"
+#define AUDIO_THEME (char*)"/audio/theme.wav"
+#define AUDIO_DEAD (char*)"/audio/dead.wav"
+#define AUDIO_CLEAR (char*)"/audio/clear.wav"
+#define AUDIO_ITEM (char*)"/audio/item.wav"
+#define AUDIO_JUMP (char*)"/audio/trampoline.wav"
 
 // class FieldInterface{
 //     int m_Size;
@@ -116,6 +120,38 @@ class Audio{
 
         Audio( char* file_name, bool priority_value );
         void play();
+};
+
+class Sound{
+    public:
+        // struct Library{
+        //     map< string, Mix_Music* > music;
+        //     map< string, Mix_Chunk* > effects;
+        // } library;
+
+        Sound();
+        void init();
+
+        class Effects{
+            public:
+                map< string, Mix_Chunk* > library;
+                void load(string name, char* file);
+                void play(string name);
+                void pause();
+                void stop();
+        } effects;
+
+        class Music{
+            public:
+                Mix_Music* bgm;
+                map< string, Mix_Music* > library;
+                void load(string name, char* file);
+                void play(string name);
+                void loop(string name);
+                void pause();
+                void stop();
+                void resume();
+        } music;
 };
 
 class Control{
@@ -501,6 +537,8 @@ class Game{
         Control controls;
         Stage stage;
         Mapper mapper;
+        Sound  sound;
+
         vector<int>   skip;
         vector<int>   collected;
         vector<Enemy> enemies;
@@ -508,7 +546,8 @@ class Game{
         vector<Door>  doors;
         vector<Trampoline> trampolines;
 
-        map< string, Audio* > sounds;
+        // map< string, Audio* > sounds;
+        // map< string, Mix_Music* > sounds;
 
         struct Cache{
             map<string, array<SDL_Texture*, FRAMES> > enemy;
@@ -536,6 +575,7 @@ class Game{
         void clear();
         void complete();
         void start();
+        void pause();
 };
 
 // *************

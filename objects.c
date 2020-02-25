@@ -385,6 +385,7 @@ void Item::render(){
 
 void Item::collect(){
     collected = true;
+    game.sound.effects.play("item");
 
     if(game.pickup==id){
         cout << "bonus " << points << "x" << game.factor << endl;

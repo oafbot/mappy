@@ -84,6 +84,7 @@ void Gravity::update(T* sprite){
                         game.trampolines[t].jumper  = "";
                     }
                 }
+                game.sound.effects.play("tramploline");
             }
             sprite->falling = false;
             speed = 0;
