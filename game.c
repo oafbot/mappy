@@ -184,6 +184,7 @@ void Game::start(){
     // }
     // SDL_PauseAudioDevice(device_id, 0);
     // sounds["theme"]->play();
+
     this->PAUSED = false;
     this->state="RUNNING";
 }
