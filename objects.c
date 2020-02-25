@@ -100,7 +100,6 @@ void GameObject::assign(int index){
     group.push_back(index);
     group.push_back(index+1);
     group.push_back(index+2);
-    cout << index << "\n";
     init();
 }
 
@@ -154,7 +153,7 @@ Trampoline::Trampoline(){
     this->bounces = 0;
     this->active = false;
     this->jumper = "";
-    array<array<int, TILE_SIZE>, BITMAP_SIZE> d = data.objects;
+    array<array<int, TILE_SIZE>, BITMAP_SIZE> d = data.trampoline;
     vector< array<array<int, TILE_SIZE>, FRAMES> > g;
 
     array<array<int, TILE_SIZE>, FRAMES>
@@ -186,6 +185,14 @@ void Trampoline::assign(int index){
     group.push_back(index+1);
     group.push_back(index+2);
     init();
+}
+
+void Trampoline::init(){
+    int col, row;
+    col = group[0] % LEVEL_WIDTH;
+    row = floor(group[0] / LEVEL_WIDTH);
+    this->x = col*BYTE*SCALE;
+    this->y = (row-1)*BYTE*SCALE;
 }
 
 void Trampoline::render(){
@@ -238,15 +245,6 @@ Trampoline::changeColor(vector< array<array<int, TILE_SIZE>, FRAMES> > grouped, 
     return replace;
 }
 
-void Trampoline::init(){
-    int col, row;
-
-    col = group[0] % LEVEL_WIDTH;
-    row = floor(group[0] / LEVEL_WIDTH);
-    this->x = col*BYTE*SCALE;
-    this->y = (row-1)*BYTE*SCALE;
-}
-
 void Trampoline::reset(){
     this->cycle = 0;
     this->frame = 5;
@@ -255,7 +253,6 @@ void Trampoline::reset(){
 }
 
 void Trampoline::bounce(){
-    // cout<<jumper<<endl;
     if(jumper=="player" && bounces<=BOUNCES){
         bounces++;
     }
@@ -279,7 +276,6 @@ void Trampoline::bounce(){
 
     active = false;
 }
-
 
 
 Item::Item(int id){
@@ -319,7 +315,7 @@ void Item::init(){
     col = group[0] % LEVEL_WIDTH;
     row = floor(group[0] / LEVEL_WIDTH);
     this->x = col*BYTE*SCALE;
-    this->y = (row-1)*BYTE*SCALE;
+    this->y = row*BYTE*SCALE;
 }
 
 void Item::assign(int index){
@@ -374,7 +370,7 @@ void Item::render(){
     if(!collected){
         SDL_Rect dest, src;
         dest.x = game.offset.x + x;
-        dest.y = game.offset.y + y + WORD;
+        dest.y = game.offset.y + y;
         dest.w = width*SCALE;
         dest.h = height*SCALE;
 
@@ -400,7 +396,249 @@ void Item::collect(){
     }
     game.pickup = id;
 
+    game.collected.push_back(id);
+
+    if(game.collected.size()==10){
+        game.timestamp = SDL_GetTicks();
+    }
+
     cout<< "score: " << game.score << endl;
 }
 
 void Item::reset(){}
+
+
+Door::Door(int id){
+    this->id       = id;
+    this->state    = "closed";
+    this->frame    = 0;
+    this->width    = 3*BYTE;
+    this->height   = 3*BYTE;
+    this->assigned = false;
+    this->animated = false;
+    this->loop     = false;
+    this->repeat   = 0;
+    this->cycle    = 0;
+    this->active   = false;
+    this->open     = false;
+
+    array<array<int, DOOR_SIZE>, 12> d = data.doors;
+
+    vector< array<int, DOOR_SIZE> >
+    closed  = {d[0]},
+    closing = {d[4], d[3], d[2], d[1], d[0]},
+    opening = {d[0], d[1], d[2], d[3], d[4]},
+    opened  = {d[4]};
+
+    switch(id+3){
+        case DOOR_RIGHT:
+            define("closed",  closed);
+            define("closing", closing);
+            define("opening", opening);
+            define("opened",  opened);
+            type = "standard";
+            direction = RIGHT;
+            offset.x = BYTE*SCALE;
+            offset.y = -2*BYTE*SCALE;
+            break;
+        case DOOR_LEFT:
+            define("closed",  flip(closed));
+            define("closing", flip(closing));
+            define("opening", flip(opening));
+            define("opened",  flip(opened));
+            type = "standard";
+            direction = LEFT;
+            offset.x = -BYTE*SCALE;
+            offset.y = -2*BYTE*SCALE;
+            break;
+    }
+
+    // todo: pool resources instead of compiling for each instance.
+    this->compile();
+}
+
+void Door::init(){
+    int col, row;
+    col = group[0] % LEVEL_WIDTH;
+    row = floor(group[0] / LEVEL_WIDTH);
+    this->x = col*BYTE*SCALE;
+    this->y = row*BYTE*SCALE;
+}
+
+void Door::assign(int index){
+    group.push_back(index);
+    // group.push_back(index+LEVEL_WIDTH);
+    // group.push_back(index+LEVEL_WIDTH+LEVEL_WIDTH);
+    init();
+}
+
+void Door::define(string name, vector< array<int, DOOR_SIZE> > frames){
+    this->states.insert(make_pair(name.c_str(), frames));
+}
+
+void Door::compile(){
+    for(map< string, vector< array<int, DOOR_SIZE> > >::iterator it=states.begin(); it!=states.end(); ++it){
+        string s = it->first;
+        vector<SDL_Texture*> images;
+
+        for(int f=0; f<it->second.size(); f++){
+            SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width*SCALE, height*SCALE);
+            SDL_SetRenderTarget(renderer, texture);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+
+            draw(it->second[f]);
+
+            images.push_back(texture);
+
+        }
+        this->cache.insert(make_pair(s, images));
+    }
+    SDL_SetRenderTarget(renderer, NULL);
+}
+
+void Door::render(){
+    if(assigned){
+        SDL_Rect dest, src;
+
+        dest.x = x + offset.x + game.offset.x;
+        dest.y = y + offset.y + game.offset.y;
+
+        dest.w = width*SCALE;
+        dest.h = height*SCALE;
+
+        src.x = 0;
+        src.y = 0;
+        src.w = width*SCALE;
+        src.h = height*SCALE;
+
+        if(animated){
+            if( frame >= 4 ){
+                reset();
+            }
+            else{
+                frame++;
+            }
+        }
+        SDL_SetTextureBlendMode(cache[state][frame], SDL_BLENDMODE_BLEND);
+        SDL_RenderCopy(renderer, cache[state][frame], &src, &dest);
+    }
+}
+
+void Door::draw(const array<int, DOOR_SIZE> &bits){
+    string color;
+    SDL_Rect r;
+
+    int w = SCALE;
+    int row;
+    int col;
+    int bit;
+    int alpha = 255;
+
+    for(int i=0; i<DOOR_SIZE; i++) {
+        bit = bits[i];
+        if(bit){
+            color = data.palette[bit];
+            SDL_Color c = hex2sdl(color);
+
+            col = i % 24;
+            row = floor(i / 24);
+
+            r.x = w*col;
+            r.y = w*row;
+            r.w = w;
+            r.h = w;
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, alpha);
+            SDL_RenderFillRect(renderer, &r);
+        }
+    }
+}
+
+vector< array<int, DOOR_SIZE> >
+Door::flip(const vector< array<int, DOOR_SIZE> > frames){
+    int row, col;
+    array<int, DOOR_SIZE> bits;
+    array<int, DOOR_SIZE> flat;
+    array<array<int, 3*BYTE>, DOOR_SIZE/(3*BYTE)> rows;
+    vector< array<int, DOOR_SIZE> > flipped;
+
+    for(int f=0; f < frames.size(); f++){
+        bits = frames[f];
+        flat = {};
+
+        for(int i=0; i < bits.size(); i++){
+            col = i % (3*BYTE);
+            row = floor(i / (3*BYTE));
+
+            if(col==0){
+                array<int, 3*BYTE> r;
+                rows[row] = r;
+            }
+            rows[row][col] = bits[i];
+        }
+
+        for(int k=0; k<rows.size(); k++){
+            reverse(rows[k].begin(), rows[k].end());
+            for(int l=0; l<rows[k].size(); l++){
+                flat[k*(3*BYTE)+l] = rows[k][l];
+            }
+        }
+        flipped.push_back(flat);
+    }
+    return flipped;
+}
+
+bool Door::range(){
+    int pos = player.index();
+    return (pos < group[0] && pos > group[0]-DOOR_RANGE) || (pos > group[0] && pos < group[0]+DOOR_RANGE);
+}
+
+void Door::operate(int index){
+    if(state=="closed"){
+        state = "opening";
+        open = true;
+        animated = true;
+
+        if(type=="standard"){
+            knockout();
+        }
+        else if(type=="magic"){
+            shockwave();
+        }
+    }
+    else if(state=="opened"){
+        state = "closing";
+        open = false;
+        animated = true;
+    }
+}
+
+void Door::knockout(){
+    for(int i=0; i<game.enemies.size(); i++){
+        int door = group[0],
+            enemy = game.enemies[i].index();
+
+        if(direction==LEFT && enemy>door-DOOR_RANGE && enemy<door-1){
+            game.enemies[i].knockedout(RIGHT);
+        }
+        else if(direction==RIGHT && enemy<door+DOOR_RANGE && enemy>door+1){
+            game.enemies[i].knockedout(LEFT);
+        }
+    }
+}
+
+void Door::shockwave(){
+
+}
+
+void Door::reset(){
+    if(state=="opening"){
+        state = "opened";
+        animated = false;
+    }
+    else if(state=="closing"){
+        state = "closed";
+        animated = false;
+    }
+    frame = 0;
+}

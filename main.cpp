@@ -1,4 +1,5 @@
 #include "game.hpp"
+#include "audio.c"
 #include "data.c"
 #include "sprite.c"
 #include "player.c"
@@ -23,6 +24,7 @@ double delta_time = 0.0;
 SDL_Window   *window;
 SDL_Renderer *renderer;
 SDL_Event     event;
+SDL_AudioDeviceID device_id;
 
 Game    game;
 Player  player;
@@ -47,16 +49,12 @@ void init(){
     player.define("hop-right", player.flip(f3));
     player.define("spin", f5);
     player.define("dead", f6);
+
     game.setup();
 }
 
-void gameloop(){
-    game.controls.input();
-
-    if(!game.PAUSED){
-        game.update();
-        game.render();
-    }
+extern void gameloop(){
+    game.loop();
 }
 
 int main(){

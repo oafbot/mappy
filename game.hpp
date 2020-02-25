@@ -3,6 +3,7 @@
 
 // #include <cstdlib>
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_mixer.h>
 // #include <SDL.h>
 #include <emscripten.h>
 #include <stdlib.h>
@@ -16,13 +17,14 @@
 #include <algorithm>
 #include <iterator>
 #include <iostream>
+
 using namespace std;
 
 #define FRAME_COUNT 7
 #define SCALE 2
 #define DIM 16
 #define SPEED 1.5
-#define ENEMY_SPEED 1.25
+#define ENEMY_SPEED 1
 #define BYTE 8
 #define WORD 16
 #define LONG 32
@@ -38,11 +40,16 @@ using namespace std;
 #define FRAMES 8
 #define BOUNCES 3
 #define SPRITE_SIZE 256
+#define DOOR_SIZE 576
 #define BITMAP_SIZE 64
 #define TILE_SIZE 64
 #define LEVEL_WIDTH 56
 #define LEVEL_HEIGHT 36
 #define LEVEL_SIZE LEVEL_WIDTH*LEVEL_HEIGHT //2016
+#define DOOR_RANGE 6
+
+#define EMPTY 0
+#define SOLID 1
 #define TRAMPOLINE 2
 #define DOOR_LEFT 3
 #define DOOR_RIGHT 4
@@ -55,25 +62,24 @@ using namespace std;
 #define SAFE 11
 #define BELL 12
 
-extern Uint32 last_time;
-extern Uint32 last_frame_time;
-extern Uint32 current_time;
-extern Uint32 ms_per_frame;
-extern int current_frame;
+#define THEME (char*)"/audio/theme.wav"
 
-extern SDL_Window *window;
-extern SDL_Renderer *renderer;
-// extern SDL_Rect background;
-extern SDL_Event event;
+// class FieldInterface{
+//     int m_Size;
+//     ~FieldInterface() = default;
+// };
 
-extern double delta_time;
-extern int    diff_time;
+// template <typename T>
+// class Field : public FieldInterface {
+//     T m_Value;
+// };
 
 struct Data{
     array <string, 56> palette;
     array <array<int, SPRITE_SIZE>, BITMAP_SIZE> sprites;
-    array <array<int, TILE_SIZE>,   BITMAP_SIZE> objects;
+    array <array<int, TILE_SIZE>,   BITMAP_SIZE> trampoline;
     array <array<int, TILE_SIZE>,   BITMAP_SIZE> tiles;
+    array <array<int, DOOR_SIZE>,  12> doors;
     array <array<int, LEVEL_SIZE>, 16> levels;
     array <array<int, LEVEL_SIZE>, 16> interactive;
     array <array<int, SPRITE_SIZE>, 6> items;
@@ -100,15 +106,17 @@ class Stage{
         Stage(int w, int h);
 };
 
-// class FieldInterface{
-//     int m_Size;
-//     ~FieldInterface() = default;
-// };
+class Audio{
+    public:
+        char FileName[100];
+        SDL_AudioSpec spec;
+        Uint32 len;
+        Uint8 *buf;
+        bool priority = false;
 
-// template <typename T>
-// class Field : public FieldInterface {
-//     T m_Value;
-// };
+        Audio( char* file_name, bool priority_value );
+        void play();
+};
 
 class Control{
     public:
@@ -138,7 +146,6 @@ class Sprite{
         bool falling;
         bool bouncing;
         bool dead;
-        bool passthru;
 
         string direction;
         string state;
@@ -168,13 +175,9 @@ class Sprite{
         virtual void ledge()  = 0;
         virtual array<array<int, SPRITE_SIZE>, FRAMES>
             flip(array<array<int, SPRITE_SIZE>, FRAMES> frames) = 0;
-        // array<double, 2> position();
-        // bool collision(Collider complement);
 };
 
-class GameObjects{
-
-};
+// class GameObjects{};
 
 class GameObject{
     public:
@@ -229,12 +232,31 @@ class Door: public GameObject{
         string state;
         string type;
         bool   open;
+        int    direction;
+        int    id;
 
-        Door();
+        struct Offset{
+            double x;
+            double y;
+        } offset;
+
+        map< string, vector< array<int, DOOR_SIZE> > > states;
+        map<string,  vector<SDL_Texture*> > cache;
+
+        Door(int id);
         void init();
         void assign(int index);
+        void define(string name, vector< array<int, DOOR_SIZE> > frames);
         void reset();
         void render();
+        void compile();
+        void draw(const array<int, DOOR_SIZE> &bits);
+        void operate(int index);
+        bool range();
+        void knockout();
+        void shockwave();
+
+        vector< array<int, DOOR_SIZE> > flip(const vector< array<int, DOOR_SIZE> > frames);
 };
 
 class Item: public GameObject{
@@ -263,15 +285,18 @@ class Collider{
     public:
         int width;
         int height;
+        int offset;
         double x;
         double y;
+        bool passthru;
         T* object;
 
     Collider(T* obj);
     void init(double x, double y, int w, int h);
     void update(double x, double y);
     template <class T2>
-    bool check(Collider<T2> collider);
+    bool check(Collider<T2>* collider);
+    void debug();
 };
 
 class Gravity{
@@ -310,28 +335,22 @@ class Player: public Sprite{
         bool falling;
         bool bouncing;
         bool dead;
-        bool passthru;
+        Uint32 timestamp;
         string direction;
         string state;
         string type;
         map< string, array<array<int, SPRITE_SIZE>, FRAMES> > states;
-        struct Absolute{
-            double x;
-            double y;
-        } absolute;
 
         Collider<Player> *collider;
         Gravity *gravity;
 
         Player();
-        // ~Player();
-        // Player(const Player &P);             // copy constructor
-        // Player & operator=(const Player &P); // assignment
         virtual void init(double x, double y);
         virtual void move();
         virtual void update();
         virtual void render();
         virtual void define(string name, array<array<int, SPRITE_SIZE>, FRAMES> frames);
+        virtual int  index();
         virtual int  index(double x, double y);
         virtual int  adjacent(int direction);
         virtual int  adjacent(int direction, double x, double y);
@@ -339,7 +358,6 @@ class Player: public Sprite{
         virtual bool traverse(int direction, double x, double y);
         virtual array<array<int, SPRITE_SIZE>, FRAMES>
             flip(array<array<int, SPRITE_SIZE>, FRAMES> frames);
-        // array<double, 2> position();
         virtual void align();
         virtual void align(bool horiz);
         virtual void deaded();
@@ -347,9 +365,12 @@ class Player: public Sprite{
         virtual void ledge();
 
         void draw(const array<array<int, SPRITE_SIZE>, FRAMES> &data);
-        template <class T>
-        bool collision(Collider<T> complement);
+        // template <class T>
+        // bool collision(Collider<T> complement);
+        void collision();
         void collect();
+        void door();
+        void reset(double x, double y);
 };
 
 class Enemy: public Sprite{
@@ -366,7 +387,7 @@ class Enemy: public Sprite{
         bool bouncing;
         bool ko;
         bool animated;
-        bool passthru;
+        // bool passthru;
         // Uint32 current;
         Uint32 timestamp;
         string direction;
@@ -375,10 +396,7 @@ class Enemy: public Sprite{
         string mode;
         map< string, array<array<int, SPRITE_SIZE>, FRAMES> > states;
         map<string, array<SDL_Texture*, FRAMES> > cache;
-        struct Absolute{
-            double x;
-            double y;
-        } absolute;
+
         Collider<Enemy> *collider;
         Gravity *gravity;
 
@@ -391,12 +409,12 @@ class Enemy: public Sprite{
         virtual array<array<int, SPRITE_SIZE>, FRAMES>
             flip(array<array<int, SPRITE_SIZE>, FRAMES> frames);
         virtual void define(string name, array<array<int, SPRITE_SIZE>, FRAMES> frames);
+        virtual int index();
         virtual int index(double x, double y);
         virtual int adjacent(int direction);
         virtual int adjacent(int direction, double x, double y);
         virtual bool traverse(int direction);
         virtual bool traverse(int direction, double x, double y);
-        // array<double, 2> position();
         virtual void align();
         virtual void align(bool horiz);
         virtual void deaded();
@@ -416,6 +434,9 @@ class Enemy: public Sprite{
         void hop(int i);
         bool aligned();
         void trampoline();
+        void knockedout(int direction);
+        void reset(double x, double y);
+        void respawn();
 };
 
 class Physics{
@@ -447,6 +468,11 @@ class Mapper{
 class Game{
     public:
         bool PAUSED;
+        bool WAIT;
+        bool RESET;
+        bool COMPLETE;
+        bool GAME_OVER;
+        bool START;
         bool scrolling;
         int  level;
         int  tiers;
@@ -454,6 +480,8 @@ class Game{
         int  hiscore;
         int  pickup;
         int  factor;
+        int  lives;
+        Uint32 timestamp;
 
         struct Center{
             double x;
@@ -465,14 +493,32 @@ class Game{
             double y;
         } offset;
 
+        string state;
+        // struct State{
+        //     bool GAME_OVER;
+        // } state;
+
         Control controls;
         Stage stage;
         Mapper mapper;
         vector<int>   skip;
+        vector<int>   collected;
         vector<Enemy> enemies;
         vector<Item>  items;
-        map< string, vector<Trampoline> > objects;
-        // Timer timer;
+        vector<Door>  doors;
+        vector<Trampoline> trampolines;
+
+        map< string, Audio* > sounds;
+
+        struct Cache{
+            map<string, array<SDL_Texture*, FRAMES> > enemy;
+            map<string, array<SDL_Texture*, FRAMES> > trampoline;
+            map<string, vector<SDL_Texture*> > door;
+            map<string, SDL_Texture*> item;
+            array<SDL_Texture*, 16> background;
+        } cache;
+
+        // map< string, vector<Trampoline> > objects;
 
         Game();
         void init(int w, int h);
@@ -482,7 +528,14 @@ class Game{
         bool delay(int delay, Uint32 start);
         void setup();
         void renderObjects();
-        int trampoline();
+        int  trampoline();
+        void reset();
+        void restart();
+        void restage();
+        void loop();
+        void clear();
+        void complete();
+        void start();
 };
 
 // *************
@@ -515,6 +568,21 @@ extern Physics physics;
 extern Player  player;
 extern Enemy   enemy;
 extern struct Data data;
+extern SDL_AudioDeviceID device_id;
+
+extern Uint32 last_time;
+extern Uint32 current_time;
+extern Uint32 ms_per_frame;
+
+extern SDL_Window *window;
+extern SDL_Renderer *renderer;
+extern SDL_Event event;
+
 // extern struct Coordinates;
+// extern Uint32 last_frame_time;
+// extern int current_frame;
+// extern SDL_Rect background;
+// extern double delta_time;
+// extern int    diff_time;
 
 #endif

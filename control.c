@@ -56,8 +56,21 @@ void Control::input(){
                         //     player.state = "down";
                         // }
                         break;
+                    case SDLK_z:
+                    case SDLK_LSHIFT:
+                        player.door();
+                        break;
                     case SDLK_SPACE:
-                        game.PAUSED = !game.PAUSED;
+                    case SDLK_RETURN:
+                        if(game.state=="START_SCREEN"){
+                            game.start();
+                        }
+                        else{
+                            game.PAUSED = !game.PAUSED;
+                        }
+                        break;
+                    case SDLK_ESCAPE:
+                        game.reset();
                     default:
                         // key_down = false;
                         break;
@@ -81,6 +94,10 @@ void Control::input(){
                     case SDLK_DOWN:
                         this->down_key_down = false;
                         this->keysup();
+                        break;
+                    // case SDLK_z:
+                    // case SDLK_LSHIFT:
+                    //     SDL_PollEvent( &event );
                         break;
                     default:
                         this->keysup();

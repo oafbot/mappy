@@ -15,18 +15,32 @@ Player::Player() : Sprite(){
     this->dead = false;
     this->repeat = 2;
     this->cycle = 0;
-    this->collider = new Collider<Player>(this);
     this->bounces = 0;
-    this->passthru = false;
-
-    this->absolute.x = x + (game.stage.full_width - game.offset.x);
-    this->absolute.y = y + game.offset.y;
+    this->timestamp = SDL_GetTicks();
+    this->collider = new Collider<Player>(this);
 };
 
 void Player::init(double x, double y){
     this->x = x;
     this->y = y;
-    collider->init(x, y, width-8, height);
+    this->collider->init(x, y, width, height);
+}
+
+void Player::reset(double x, double y){
+    this->gravitation = true;
+    this->falling  = false;
+    this->bouncing = false;
+    this->direction = "left";
+    this->state = "left";
+    this->type = "player";
+    this->frame = 0;
+    this->dead = false;
+    this->repeat = 2;
+    this->cycle = 0;
+    this->bounces = 0;
+    this->collider->passthru = false;
+    this->x = x;
+    this->y = y;
 }
 
 void Player::move(){
@@ -44,13 +58,9 @@ void Player::move(){
                 this->x = game.stage.left;
             }
             if(bouncing){
-                // state = "hop-left";
                 if(game.delay()){ return; }
                 bouncing = false;
             }
-            // else if(falling){
-            //     state = "hop-left";
-            // }
         }
     }
 
@@ -68,18 +78,11 @@ void Player::move(){
                 this->x = game.stage.right-this->width*2;
             }
             if(bouncing){
-                // state = "hop-right";
                 if(game.delay()){ return; }
                 bouncing = false;
             }
-            // else if(falling){
-            //     state = "hop-right";
-            // }
         }
     }
-
-    this->absolute.x = x + (game.stage.full_width - game.offset.x);
-    this->absolute.y = y + game.offset.y;
 }
 
 bool Player::traverse(int direction){
@@ -87,8 +90,26 @@ bool Player::traverse(int direction){
     if(tile==0){
         return true;
     }
-    if(tile>6 && tile<13){
+    if(tile>=RADIO && tile<=BELL){
         return true;
+    }
+    if(tile>=DOOR_LEFT && tile<=MAGIC_DOOR_R){
+        switch(direction){
+            case RIGHT:
+                for(int i=0; i<game.doors.size(); i++){
+                    if(contains(game.doors[i].group, index(x, y)+1) && game.doors[i].open){
+                        return true;
+                    }
+                }
+                break;
+            case LEFT:
+                for(int i=0; i<game.doors.size(); i++){
+                    if(contains(game.doors[i].group, index(x, y)-1) && game.doors[i].open){
+                        return true;
+                    }
+                }
+                break;
+        }
     }
     return false;
 }
@@ -98,38 +119,52 @@ bool Player::traverse(int direction, double x, double y){
     if(tile==0){
         return true;
     }
-    if(tile>6 && tile<13){
+    if(tile>=RADIO && tile<=BELL){
         return true;
+    }
+    if(tile>=DOOR_LEFT && tile<=MAGIC_DOOR_R){
+        switch(direction){
+            case RIGHT:
+                for(int i=0; i<game.doors.size(); i++){
+                    if(contains(game.doors[i].group, index(x, y)+1) && game.doors[i].open){
+                        return true;
+                    }
+                }
+                break;
+            case LEFT:
+                for(int i=0; i<game.doors.size(); i++){
+                    cout << (contains(game.doors[i].group, index(x, y)+1) && game.doors[i].open) << endl;
+                    if(contains(game.doors[i].group, index(x, y)-1) && game.doors[i].open){
+                        return true;
+                    }
+                }
+                break;
+        }
     }
     return false;
 }
 
 void Player::ledge(){
     if(adjacent(DOWN_LEFT)!=1 || adjacent(DOWN_RIGHT)!=1){
-        // cout << "true" << endl;
-        this->passthru = true;
+        this->collider->passthru = true;
     }
     else{
-        // cout << "false" << endl;
-        this->passthru = false;
+        this->collider->passthru = false;
     }
-    // if(direction=="left" && adjacent(DOWN_LEFT)==0){
-    //     return true;
-    // }
-    // else if(direction=="right" && adjacent(DOWN_RIGHT)==0){
-    //     return true;
-    // }
 }
 
-// array<double, 2>
-// Player::position(){
-//     array<double, 2> coord;
-//     return coord;
-// }
-
 int Player::index(double x, double y){
-    // printf("%f %f\n", x, y);
-    // printf("%f\n", game.offset.x);
+    int tile = BYTE*SCALE;
+    double diff = game.stage.width-(LEVEL_WIDTH*tile);
+    double xpos;
+    xpos = x + (width/2)*SCALE - game.offset.x;
+
+    int col = (int)floor(xpos/tile);
+    int row = (int)floor((y+height-game.offset.y)/tile);
+    return col + row*LEVEL_WIDTH;
+}
+
+int Player::index(){
     int tile = BYTE*SCALE;
     double diff = game.stage.width-(LEVEL_WIDTH*tile);
     double xpos;
@@ -282,7 +317,7 @@ void Player::update(){
     if(state!="dead" && state!="spin"){
         if(this->falling && !game.controls.key_down){
             this->state = "drop";
-            this->passthru = true;
+            this->collider->passthru = true;
         }
         else if(this->bouncing && !game.controls.key_down){
             if(this->y<300){
@@ -290,22 +325,29 @@ void Player::update(){
             }else{
                 this->state = "bound";
             }
-            this->passthru = true;
+            this->collider->passthru = true;
         }
         else{
             if(this->falling || this->bouncing){
                 // if(state!="turn")
                 this->state = this->direction=="left" ? "hop-left" : "hop-right";
-                this->passthru = true;
+                this->collider->passthru = true;
             }
             else{
                 this->state = this->direction;
-                this->passthru = false;
+                this->collider->passthru = false;
             }
         }
     }
     else if(state=="spin"){
 
+    }
+    else if(state=="dead"){
+        game.RESET = true;
+        if(game.delay(3000, timestamp)){
+            return;
+        }
+        game.restart();
     }
 
     if(game.scrolling && (game.offset.x>=OFFSET || game.offset.x<=-OFFSET*2)){
@@ -316,27 +358,17 @@ void Player::update(){
     }
 
     ledge();
-    collider->update(x+4, y);
+    collider->update(x, y);
 
     collect();
-
-    if(!bouncing && !falling){
-        for(int i=0; i<game.enemies.size(); i++){
-            if(!game.enemies[i].bouncing && !game.enemies[i].falling){
-                if(!passthru && collision(*game.enemies[i].collider)){
-                    deaded();
-                    break;
-                }
-            }
-        }
-    }
+    collision();
 }
 
 void Player::collect(){
     int pos = index(x, y);
     int tile = data.interactive[game.level-1][pos];
 
-    if(tile>6 && tile<13){
+    if(tile>=RADIO && tile<=SAFE){
         for(int i=0; i<game.items.size(); i++){
             if(contains(game.items[i].group, pos) && !game.items[i].collected){
                 game.items[i].collect();
@@ -374,20 +406,33 @@ void Player::deaded(){
         falling  = false;
         dead = true;
         game.controls.lock = true;
+        game.lives -= 1;
+        timestamp = SDL_GetTicks();
     }
 }
 
-template <class T>
-bool Player::collision(Collider<T> complement){
-    // cout << this->collider->check(complement) << endl;
-    return this->collider->check(complement);
+// template <class T>
+void Player::collision(){
+    if(!dead)
+        for(int i=0; i<game.enemies.size(); i++){
+            if(collider->check(game.enemies[i].collider)){
+                deaded();
+                break;
+            }
+        }
 }
 
 void Player::bounce(){
     if(bounces<=BOUNCES){
         bounces++;
     }
-    // else{
-    //     deaded();
-    // }
+}
+
+void Player::door(){
+    for(int i=0; i<game.doors.size(); i++){
+        if(game.doors[i].range()){
+            game.doors[i].operate(index(x, y));
+            break;
+        }
+    }
 }

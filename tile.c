@@ -38,8 +38,8 @@ void Mapper::render(){
     SDL_Rect dest, src;
     dest.x = game.offset.x;
     dest.y = 0;
-    dest.w = LEVEL_WIDTH*BYTE*SCALE;  //game.stage.width;
-    dest.h = LEVEL_HEIGHT*BYTE*SCALE; //game.stage.height;
+    dest.w = LEVEL_WIDTH*BYTE*SCALE;
+    dest.h = LEVEL_HEIGHT*BYTE*SCALE;
 
     src.x = 0;
     src.y = 0;
