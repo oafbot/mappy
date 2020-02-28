@@ -192,14 +192,6 @@ void Game::start(){
     this->state="RUNNING";
 }
 
-// void Game::compile(){
-//     Enemy::compile();
-//     // Door::compile();
-//     // Item::compile();
-//     // Wave::compile();
-//     // Trampoline::compile();
-// }
-
 void Game::init(int w, int h){
     this->stage = * new Stage(w, h);
     this->center.x = this->stage.width/2;
@@ -255,10 +247,14 @@ int Game::trampoline(){
 
 void Game::pause(){
     PAUSED = !PAUSED;
-    if(PAUSED)
+    if(PAUSED){
         sound.music.pause();
-    else
-        game.sound.music.resume();
+        sound.effects.pause();
+    }
+    else{
+        sound.music.resume();
+        sound.effects.resume();
+    }
 }
 
 void Game::clear(){

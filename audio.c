@@ -24,13 +24,13 @@ void Sound::Effects::loop(string name){
     Mix_PlayChannel(-1, library[name], -1);
 }
 
-// void Sound::Music::pause(){
-//     Mix_PauseMusic();
-// }
+void Sound::Effects::pause(){
+    Mix_Pause(-1);
+}
 
-// void Sound::Music::resume(){
-//     Mix_ResumeMusic();
-// }
+void Sound::Effects::resume(){
+    Mix_Resume(-1);
+}
 
 void Sound::Effects::stop(){
     Mix_HaltChannel(-1);

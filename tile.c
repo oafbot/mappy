@@ -5,34 +5,59 @@ Mapper::Mapper(){
 
 void Mapper::init(){
     // setStatus("Compiling levels...\n");
-    for(int i=0; i<data.levels.size(); i++){
-        this->compile(i);
-    };
+    this->compile();
 }
 
-void Mapper::compile(int level){
-    int col;
-    int row;
+void Mapper::compile(){
+    int col, row;
+    SDL_Rect dest, src;
     SDL_Texture *texture;
 
-    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET,
-                                LEVEL_WIDTH*BYTE*SCALE, LEVEL_HEIGHT*BYTE*SCALE);
-    SDL_SetRenderTarget(renderer, texture);
+    for(int i=0; i<data.tiles.size(); i++){
+        texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, BYTE*SCALE, BYTE*SCALE);
+        SDL_SetRenderTarget(renderer, texture);
 
-    for(int i=0; i<LEVEL_SIZE; i++){
-        if(i){
-            col = i % LEVEL_WIDTH;
-            row = floor(i / LEVEL_WIDTH);
+        this->draw(data.tiles[i]);
 
-            this->x = col*BYTE*SCALE;
-            this->y = row*BYTE*SCALE;
-            this->draw(data.tiles[data.levels[level][i]]);
-        }
+        game.cache.tiles.push_back(texture);
+        SDL_SetRenderTarget(renderer, NULL);
     }
-    this->background[level] = texture;
 
-    SDL_SetRenderTarget(renderer, NULL);
-    cout << "level " << level+1 << endl;
+    for(int level=0; level<data.levels.size(); level++){
+        // cout << "level " << level+1 << endl;
+
+        texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET,
+                                    LEVEL_WIDTH*BYTE*SCALE, LEVEL_HEIGHT*BYTE*SCALE);
+
+        SDL_SetRenderTarget(renderer, texture);
+
+        for(int i=0; i<LEVEL_SIZE; i++){
+            if(i){
+                col = i % LEVEL_WIDTH;
+                row = floor(i / LEVEL_WIDTH);
+
+                this->x = col*BYTE*SCALE;
+                this->y = row*BYTE*SCALE;
+
+                dest.x = x;
+                dest.y = y;
+                dest.w = BYTE*SCALE;
+                dest.h = BYTE*SCALE;
+
+                src.x = 0;
+                src.y = 0;
+                src.w = BYTE*SCALE;
+                src.h = BYTE*SCALE;
+
+
+
+                SDL_RenderCopy(renderer, game.cache.tiles[data.levels[level][i]], &src, &dest);
+            }
+        }
+        this->background[level] = texture;
+
+        SDL_SetRenderTarget(renderer, NULL);
+    }
 }
 
 void Mapper::render(){
@@ -69,8 +94,8 @@ void Mapper::draw(const array<int, TILE_SIZE> &bits){
             col = i % BYTE;
             row = floor(i / BYTE);
 
-            r.x = this->x + w*col;
-            r.y = this->y + w*row;
+            r.x = w*col;
+            r.y = w*row;
             r.w = w;
             r.h = w;
             SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, alpha);

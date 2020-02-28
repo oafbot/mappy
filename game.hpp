@@ -106,7 +106,7 @@ struct Data{
     array <string, 56> palette;
     array <array<int, SPRITE_SIZE>, BITMAP_SIZE> sprites;
     array <array<int, TILE_SIZE>,   BITMAP_SIZE> trampoline;
-    array <array<int, TILE_SIZE>,   BITMAP_SIZE> tiles;
+    array <array<int, TILE_SIZE>,  21> tiles;
     array <array<int, DOOR_SIZE>,  12> doors;
     array <array<int, LEVEL_SIZE>, 16> levels;
     array <array<int, LEVEL_SIZE>, 16> interactive;
@@ -147,6 +147,7 @@ class Sound{
                 void loop(string name);
                 void pause();
                 void stop();
+                void resume();
         } effects;
 
         class Music{
@@ -309,7 +310,7 @@ class Trampoline: public GameObject{
 
         vector< Coordinates > layout;
         map< string, vector< array<array<int, TILE_SIZE>, FRAMES> > >states;
-        map<string, array<SDL_Texture*, FRAMES> > cache;
+        map<string, array<SDL_Texture*, FRAMES> >* cache;
 
         Trampoline();
         void init();
@@ -376,6 +377,7 @@ class Door: public GameObject{
     public:
         string state;
         string type;
+        string key;
         bool   open;
         int    direction;
         int    id;
@@ -386,7 +388,7 @@ class Door: public GameObject{
         } offset;
 
         map< string, vector< array<int, DOOR_SIZE> > > states;
-        map<string,  vector<SDL_Texture*> > cache;
+        map<string,  vector<SDL_Texture*> >* cache;
 
         Wave wave;
 
@@ -577,7 +579,7 @@ class Mapper{
 
         Mapper();
         void init();
-        void compile(int level);
+        void compile();
         void render();
         void draw(const array<int, TILE_SIZE> &data);
 };
@@ -628,13 +630,14 @@ class Game{
         vector<Item>  items;
         vector<Door>  doors;
         vector<Trampoline> trampolines;
-        vector<const char *> cached;
+        vector<string> cached;
 
         struct Cache{
             map<string, array<SDL_Texture*, FRAMES> > enemy;
             map<string, array<SDL_Texture*, FRAMES> > trampoline;
-            map<int, map<string, vector<SDL_Texture*> > > door;
+            map<string, map<string, vector<SDL_Texture*> > > door;
             map<string, SDL_Texture*> item;
+            vector<SDL_Texture*> tiles;
             array<SDL_Texture*, 16> background;
         } cache;
 
@@ -655,7 +658,6 @@ class Game{
         void complete();
         void start();
         void pause();
-        void compile();
 };
 
 // *************

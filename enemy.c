@@ -191,7 +191,7 @@ void Enemy::render(){
 }
 
 void Enemy::compile(){
-    if(!contains(game.cached, "enemy")){
+    if(!contains(game.cached, type)){
         for(map< string, array< array<int, SPRITE_SIZE>, FRAMES> >::iterator it=states.begin(); it!=states.end(); ++it){
             string s = it->first;
             array<SDL_Texture*, FRAMES> images;

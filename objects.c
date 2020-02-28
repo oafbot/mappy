@@ -119,6 +119,7 @@ void GameObject::render(){
 
 Trampoline::Trampoline(){
     this->state = "green";
+    this->type = "trampoline";
     this->frame = 5;
     this->width = 3*BYTE;
     this->height = BYTE;
@@ -130,7 +131,7 @@ Trampoline::Trampoline(){
     this->bounces = 0;
     this->active = false;
     this->jumper = "";
-    this->cache = game.cache.trampoline;
+    this->cache = &game.cache.trampoline;
 
     array<array<int, TILE_SIZE>, BITMAP_SIZE> d = data.trampoline;
     vector< array<array<int, TILE_SIZE>, FRAMES> > g;
@@ -207,7 +208,7 @@ void Trampoline::render(){
         }
     }
 
-    SDL_RenderCopy(renderer, cache[state][frame], &src, &dest);
+    SDL_RenderCopy(renderer, (*cache)[state][frame], &src, &dest);
 }
 
 void Trampoline::draw(const array<int, TILE_SIZE> &bits, Coordinates offset){
@@ -240,7 +241,7 @@ void Trampoline::draw(const array<int, TILE_SIZE> &bits, Coordinates offset){
 }
 
 void Trampoline::compile(){
-    if(!contains(game.cached, "trampoline")){
+    if(!contains(game.cached, type)){
         for(map< string, vector< array< array<int, TILE_SIZE>, FRAMES> > >::iterator it=states.begin(); it!=states.end(); ++it){
             string s = it->first;
             array<SDL_Texture*, FRAMES> images;
@@ -255,7 +256,7 @@ void Trampoline::compile(){
 
                 images[f] = texture;
             }
-            this->cache.insert(make_pair(s, images));
+            this->cache->insert(make_pair(s, images));
         }
         game.cached.push_back("trampoline");
         SDL_SetRenderTarget(renderer, NULL);
@@ -390,7 +391,7 @@ Item::Item(int id){
             break;
     }
 
-    this->cache = game.cache.item[type];
+    // this->cache = game.cache.item[type];
     this->compile();
 }
 
@@ -404,21 +405,25 @@ void Item::assign(int index){
 }
 
 void Item::compile(){
-    if(!contains(game.cached, this->type.c_str())){
+    // /if(!contains(game.cached, type.c_str())){
+        // cout<<type.c_str()<<endl;
+
         SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width*SCALE, height*SCALE);
         SDL_SetRenderTarget(renderer, texture);
 
         draw(data.items[id]);
 
-        game.cache.item[type] = texture;
+        cache = texture;
         SDL_SetRenderTarget(renderer, NULL);
-        game.cached.push_back(this->type.c_str());
-    }
+
+        // game.cached.push_back(type.c_str());
+    // }
 }
 
 void Item::render(){
     if(!collected){
         GameObject::render();
+
     }
 }
 
@@ -525,7 +530,8 @@ Door::Door(int id) : wave(RIGHT){
     }
 
     // todo: pool resources instead of compiling for each instance.
-    this->cache = game.cache.door[id];
+    this->key = "door-"+to_string(id);
+    this->cache = &game.cache.door[key];
     this->compile();
 }
 
@@ -548,6 +554,10 @@ void Door::cleanup(){
     this->x        = 0;
     this->y        = 0;
     this->group.clear();
+
+    if(id+3==MAGIC_DOOR_R || id+3==MAGIC_DOOR_L){
+        wave.cleanup();
+    }
 }
 
 void Door::define(string name, vector< array<int, DOOR_SIZE> > frames){
@@ -555,7 +565,7 @@ void Door::define(string name, vector< array<int, DOOR_SIZE> > frames){
 }
 
 void Door::compile(){
-    if(!contains(game.cached, ("door-"+to_string(id)).c_str())){
+    if(!contains(game.cached, key)){
         for(map< string, vector< array<int, DOOR_SIZE> > >::iterator it=states.begin(); it!=states.end(); ++it){
             string s = it->first;
             vector<SDL_Texture*> images;
@@ -570,10 +580,11 @@ void Door::compile(){
                 images.push_back(texture);
 
             }
-            game.cache.door[id].insert(make_pair(s, images));
+            cache->insert(make_pair(s, images));
         }
-        game.cached.push_back(("door-"+to_string(id)).c_str());
         SDL_SetRenderTarget(renderer, NULL);
+
+        game.cached.push_back(key);
     }
 }
 
@@ -600,8 +611,8 @@ void Door::render(){
                 frame++;
             }
         }
-        SDL_SetTextureBlendMode(cache[state][frame], SDL_BLENDMODE_BLEND);
-        SDL_RenderCopy(renderer, cache[state][frame], &src, &dest);
+        SDL_SetTextureBlendMode((*cache)[state][frame], SDL_BLENDMODE_BLEND);
+        SDL_RenderCopy(renderer, (*cache)[state][frame], &src, &dest);
     }
 }
 
@@ -736,13 +747,13 @@ void Door::shockwave(){
 Wave::Wave(int d){
     direction = d;
     collider = new Collider<Wave>(this);
-    collider->init(x+game.offset.x, y+game.offset.y, DIM*SCALE, DIM*SCALE);
+    collider->init(x+game.offset.x, y+game.offset.y, DIM*SCALE, DIM*SCALE-BYTE);
     compile();
 }
 
 void Wave::init(){
     GameObject::init();
-    y -= 24*SCALE;
+    y -= 3*BYTE*SCALE;
 }
 
 void Wave::assign(int index){
@@ -806,7 +817,7 @@ void Wave::update(){
             captured.clear();
             game.sound.effects.stop();
         }
-        collider->update(x+game.offset.x, y+game.offset.y);
+        collider->update(x+game.offset.x, y+game.offset.y+BYTE*SCALE);
     }
 }
 
@@ -830,8 +841,14 @@ void Wave::activate(){
     game.sound.effects.loop("wave" );
 }
 
-void Wave::reset(){}
-void Wave::cleanup(){}
+void Wave::reset(){
+
+}
+
+void Wave::cleanup(){
+    group.clear();
+    assigned = false;
+}
 
 
 // -----------
