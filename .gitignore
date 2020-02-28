@@ -4,3 +4,5 @@
 README.html
 *.zip
 audio/*
+snippets.cpp
+cut.cpp

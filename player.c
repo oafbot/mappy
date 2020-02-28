@@ -58,7 +58,7 @@ void Player::move(){
                 this->x = game.stage.left;
             }
             if(bouncing){
-                if(game.delay()){ return; }
+                if( !game.interval() ){ return; }
                 bouncing = false;
             }
         }
@@ -78,7 +78,7 @@ void Player::move(){
                 this->x = game.stage.right-this->width*2;
             }
             if(bouncing){
-                if(game.delay()){ return; }
+                if( !game.interval() ){ return; }
                 bouncing = false;
             }
         }
@@ -413,7 +413,6 @@ void Player::deaded(){
     }
 }
 
-// template <class T>
 void Player::collision(){
     if(!dead)
         for(int i=0; i<game.enemies.size(); i++){

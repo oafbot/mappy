@@ -10,13 +10,10 @@ void Control::input(){
                         if(!player.dead && !lock){
                             this->left_key_down = true;
                             this->key_down = true;
-                            // cout << player.x+game.offset.x << ", " << player.y+game.offset.y << endl;
+
                             if(!player.falling && !player.bouncing){
                                 player.state = "left";
                             }
-                            // else if(player.direction!="left"){
-                            //     player.state = "turn";
-                            // }
                             else{
                                 player.state = "hop-left";
                             }
@@ -31,9 +28,6 @@ void Control::input(){
                             if(!player.falling && !player.bouncing){
                                 player.state = "right";
                             }
-                            // else if(player.direction!="right"){
-                            //     player.state = "turn";
-                            // }
                             else{
                                 player.state = "hop-right";
                             }
@@ -43,21 +37,16 @@ void Control::input(){
                     case SDLK_UP:
                         this->up_key_down = true;
                         this->key_down = true;
-                        // player.direction = "up";
-                        // if(!player.falling && !player.bouncing){
-                        //     player.state = "up";
-                        // }
                         break;
                     case SDLK_DOWN:
                         this->down_key_down = true;
                         this->key_down = true;
-                        // player.direction = "down";
-                        // if(!player.falling && !player.bouncing){
-                        //     player.state = "down";
-                        // }
+
+
                         break;
                     case SDLK_z:
                     case SDLK_LSHIFT:
+                    case SDLK_RSHIFT:
                         player.door();
                         break;
                     case SDLK_SPACE:

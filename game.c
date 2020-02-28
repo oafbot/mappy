@@ -28,8 +28,9 @@ Game::Game() : stage(0,0){
     this->mapper    = * new Mapper();
     this->controls  = * new Control();
     this->sound     = * new Sound();
+    this->timer     = * new Timer();
     this->controls.lock = false;
-    this->state="START_SCREEN";
+    this->state = "START_SCREEN";
 }
 
 void Game::update(){
@@ -44,18 +45,23 @@ void Game::update(){
     if(collected.size()==10){
         complete();
     }
+
+    for(int i=0; i<doors.size(); i++){
+        if(doors[i].type=="magic" && doors[i].wave.active){
+            doors[i].wave.update();
+        }
+    }
 }
 
-bool Game::delay(){
+bool Game::interval(){
     int ms;
 
     current_time = SDL_GetTicks();
     ms = current_time - last_time;
 
-    if( ms < ms_per_frame ){
-        return true;
-    }
-    return false;
+    if( ms < ms_per_frame )
+        return false;
+    return true;
 }
 
 bool Game::delay(int delay, Uint32 start){
@@ -67,6 +73,9 @@ bool Game::delay(int delay, Uint32 start){
     return false;
 }
 
+// void Game::clock(){
+//     timestamp = SDL_GetTicks();
+// }
 
 void Game::renderObjects(){
     for(int i=0; i<trampolines.size(); i++){
@@ -75,8 +84,11 @@ void Game::renderObjects(){
         }
     }
     for(int i=0; i<doors.size(); i++){
-        if(doors[i].assigned)
-            doors[i].render();
+        doors[i].render();
+        if(doors[i].type=="magic"){
+            doors[i].wave.render();
+            // doors[i].wave.collider->debug();
+        }
     }
     for(int i=0; i<items.size(); i++){
         items[i].render();
@@ -88,9 +100,7 @@ void Game::renderObjects(){
 }
 
 void Game::render(){
-    if(delay()){
-        return;
-    };
+    if(!interval()){ return; }
 
     mapper.render();
     renderObjects();
@@ -112,18 +122,19 @@ void Game::loop(){
 }
 
 void Game::setup(){
-    vector<int>::iterator it;
+    int key;
+    bool found;
+    // vector<int>::iterator it;
 
     for(int i=0; i<LEVEL_SIZE; i++){
-        int key = data.interactive[level-1][i];
-        it = find(skip.begin(), skip.end(), i);
+        key = data.interactive[level-1][i];
+        found = find(skip.begin(), skip.end(), i)!=skip.end();
 
-        if(key>1 && it==skip.end()){
+        if(key>1 && !found){
             switch(key){
                 case TRAMPOLINE:
                     for(int t=0; t<trampolines.size(); t++){
                         if(!trampolines[t].assigned){
-                            trampolines[t].assigned = true;
                             trampolines[t].assign(i);
 
                             skip.push_back(i);
@@ -140,7 +151,6 @@ void Game::setup(){
                     for(int d=0; d<doors.size(); d++){
                         if(!doors[d].assigned && doors[d].id==key-3){
                             doors[d].assign(i);
-                            doors[d].assigned = true;
                             skip.push_back(i);
                             break;
                         }
@@ -168,29 +178,27 @@ void Game::setup(){
 }
 
 void Game::start(){
-    // Mix_Music *music;
-    // sounds["theme"] = Mix_LoadMUS("audio/theme.wav");
-    // Mix_PlayMusic(sounds["theme"], -1);
     sound.init();
     sound.music.load("theme", AUDIO_THEME);
-    sound.effects.load("tampoline", AUDIO_JUMP);
     sound.effects.load("dead", AUDIO_DEAD);
     sound.effects.load("clear", AUDIO_CLEAR);
     sound.effects.load("item", AUDIO_ITEM);
+    sound.effects.load("wave", AUDIO_WAVE);
+    sound.effects.load("trampoline", AUDIO_JUMP);
 
     sound.music.loop("theme");
 
-    // sounds["theme"] = new Audio(THEME, false);
-    // device_id = SDL_OpenAudioDevice(NULL, 0, &(sounds["theme"]->spec), NULL, 0);
-
-    // if(device_id == 0) {
-    //     printf("Failed to open audio: %s\n", SDL_GetError());
-    // }
-    // SDL_PauseAudioDevice(device_id, 0);
-    // sounds["theme"]->play();
     this->PAUSED = false;
     this->state="RUNNING";
 }
+
+// void Game::compile(){
+//     Enemy::compile();
+//     // Door::compile();
+//     // Item::compile();
+//     // Wave::compile();
+//     // Trampoline::compile();
+// }
 
 void Game::init(int w, int h){
     this->stage = * new Stage(w, h);
@@ -228,8 +236,12 @@ void Game::init(int w, int h){
         Enemy mewkie = * new Enemy();
         mewkie.init(data.spawn[i][0], data.spawn[i][1]);
         mewkie.gravity = physics.gravity(0.125, 0);
+        mewkie.id = i;
         enemies.push_back(mewkie);
     }
+
+    for(int i=0; i<cached.size(); i++){ cout << cached[i] << " "; }
+    cout<<endl;
 }
 
 int Game::trampoline(){
@@ -265,7 +277,9 @@ void Game::complete(){
     if(game.delay(2000, timestamp)){
         return;
     }
+
     collected.clear();
+    // timeout = timer.start(2000);
     restage();
 }
 
@@ -287,10 +301,7 @@ void Game::restage(){
     }
 
     for(int d=0; d<doors.size(); d++){
-        doors[d].assigned = false;
-        doors[d].open     = false;
-        doors[d].state    = "closed";
-        doors[d].group.clear();
+        doors[d].cleanup();
     }
 
     for(int i=0; i<data.enemies[level-1]; i++){
@@ -302,22 +313,15 @@ void Game::restage(){
     player.reset(580, 480);
     controls.lock = false;
 
-    game.sound.music.loop("theme");
+    this->PAUSED   = false;
+    this->RESET    = false;
+    this->COMPLETE = false;
 
-    this->PAUSED    = false;
-    this->RESET     = false;
-    this->COMPLETE  = false;
+    game.sound.music.loop("theme");
 }
 
 void Game::restart(){
     clear();
-    this->PAUSED    = false;
-    this->RESET     = false;
-    this->COMPLETE  = false;
-    this->scrolling = true;
-    this->offset.x  = -182;
-    this->offset.y  = 0;
-    this->pickup    = -1;
 
     player.reset(580, 480);
     controls.lock = false;
@@ -330,45 +334,18 @@ void Game::restart(){
         trampolines[t].reset();
     }
 
+    this->PAUSED    = false;
+    this->RESET     = false;
+    this->COMPLETE  = false;
+    this->scrolling = true;
+    this->offset.x  = -182;
+    this->offset.y  = 0;
+    this->pickup    = -1;
+
     game.sound.music.loop("theme");
 }
 
 void Game::reset(){
-    clear();
-
-    for(int t=0; t<trampolines.size(); t++){
-        trampolines[t].assigned = false;
-    }
-
-    for(int d=0; d<doors.size(); d++){
-        doors[d].assigned = false;
-        doors[d].state    = "closed";
-        doors[d].open     = false;
-    }
-
-    this->skip.clear();
-
-    setup();
-
-    clear();
-
-    player.reset(580, 480);
-    controls.lock   = false;
-
-    this->level     = 1;
-    this->PAUSED    = false;
-    this->RESET     = false;
-    this->COMPLETE  = false;
-    this->offset.x  = -182;
-    this->offset.y  = 0;
-    this->scrolling = true;
-    this->score     = 0;
-    this->pickup    = -1;
-    this->lives     = 3;
-    this->factor    = 2;
-
-    for(int i=0; i<data.enemies[level-1]; i++){
-        enemies[i].reset(data.spawn[i][0], data.spawn[i][1]);
-    }
-
+    level = 0;
+    restage();
 }

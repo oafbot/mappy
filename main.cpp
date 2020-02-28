@@ -7,6 +7,7 @@
 #include "physics.c"
 #include "control.c"
 #include "objects.c"
+#include "timer.c"
 #include "game.c"
 #include "tile.c"
 #include <type_traits>
@@ -24,7 +25,6 @@ double delta_time = 0.0;
 SDL_Window   *window;
 SDL_Renderer *renderer;
 SDL_Event     event;
-SDL_AudioDeviceID device_id;
 
 Game    game;
 Player  player;
@@ -53,7 +53,7 @@ void init(){
     game.setup();
 }
 
-extern void gameloop(){
+void gameloop(){
     game.loop();
 }
 

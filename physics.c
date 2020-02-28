@@ -35,10 +35,13 @@ bool Gravity::fallthru(T* sprite){
         if(find(begin(group), end(group), index) != end(group)){
             game.trampolines[t].bounce();
 
-            if(game.trampolines[t].bounces>=BOUNCES && sprite->type=="player"){
+            if(game.trampolines[t].bounces>=BOUNCES && sprite->type=="player" && sprite->y>GROUND_FLOOR){
                 speed = 0.5;
                 sprite->frame = 0;
                 sprite->state = "spin";
+                return true;
+            }
+            else if(game.trampolines[t].bounces>=BOUNCES && sprite->y<GROUND_FLOOR){
                 return true;
             }
         }
@@ -49,6 +52,7 @@ bool Gravity::fallthru(T* sprite){
 template <class T>
 void Gravity::update(T* sprite){
     int tile, index;
+    bool broken;
     vector<int> group;
 
     if(!game.PAUSED && delay==0 && sprite->gravitation){
@@ -77,14 +81,9 @@ void Gravity::update(T* sprite){
 
                 if(sprite->type=="player"){
                     for(int t=0; t<game.trampolines.size(); t++){
-                        game.trampolines[t].reset();
-                        game.trampolines[t].bounces = 0;
-                        game.trampolines[t].state   = "green";
-                        game.trampolines[t].active  = false;
-                        game.trampolines[t].jumper  = "";
+                        game.trampolines[t].clear();
                     }
                 }
-                game.sound.effects.play("tramploline");
             }
             sprite->falling = false;
             speed = 0;
@@ -92,7 +91,7 @@ void Gravity::update(T* sprite){
 
         tile = sprite->adjacent(DOWN);
 
-        if(tile==2){
+        if(tile==TRAMPOLINE){
             // Bouncing
             index = sprite->index(sprite->x, sprite->y)+LEVEL_WIDTH;
 
@@ -109,29 +108,41 @@ void Gravity::update(T* sprite){
                         bound(sprite);
                     }
                     else if(game.trampolines[t].active){
-                        // cout << "active" << endl;
                         // pass
                     }
-                    else if(sprite->type=="player"){
+                    else if(sprite->type=="player" && sprite->y>GROUND_FLOOR){
                         sprite->deaded();
                     }
-                    else if(sprite->type=="enemy"){
+                    else if(sprite->type=="enemy" && sprite->y>GROUND_FLOOR){
                         game.trampolines[t].active = true;
                         bound(sprite);
                     }
-
                 }
             }
         }
 
         if(sprite->bouncing){
-            if( game.delay() ){ return; }
+            if( !game.interval() ){ return; }
 
             sprite->y -= lift;
 
-            tile = sprite->adjacent(UP);
+            index = sprite->index() - LEVEL_WIDTH;
+            tile  = sprite->adjacent(UP);
+            broken = false;
 
-            if(tile!=0){
+            if(tile==TRAMPOLINE){
+                for(int t=0; t<game.trampolines.size(); t++){
+                    group = game.trampolines[t].group;
+                    if(find(begin(group), end(group), index) != end(group)){
+                        if(game.trampolines[t].state=="broken"){
+                            broken = true;
+                        }
+                        break;
+                    }
+                }
+            }
+
+            if(tile!=EMPTY && !broken){
                 lift = 0;
                 sprite->state = "turn";
                 sprite->falling = true;
@@ -150,14 +161,15 @@ void Gravity::bound(T* sprite){
     sprite->falling = false;
     sprite->bouncing = true;
 
-    // if(sprite->type=="player") cout << sprite->x << endl;
-
     sprite->align(true);
     sprite->bounce();
 
     if(lift==0){
         lift = max*2;
     }
+
+    if(sprite->type=="player")
+        game.sound.effects.play("trampoline");
 };
 
 
@@ -202,15 +214,7 @@ bool Collider<T>::check(Collider<T2>* collider){
     if(this->passthru || collider->passthru){
         return false;
     }
-    // if(object->state=="hop-right" || collider.object->state=="hop-right" ||
-    //    object->state=="hop-left"  || collider.object->state=="hop-left"  ||
-    //    object->falling            || collider.object->falling            ||
-    //    object->bouncing           || collider.object->bouncing           ||
-    //    object->passthru           || collider.object->passthru           ){
-    //     return false;
-    // }
 
-    // cout << object->passthru << collider.object->passthru<<endl;
     double ax0 = x,
            ax1 = x + width,
            ay0 = y,

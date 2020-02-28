@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <iterator>
 #include <iostream>
+#include <set>
 
 using namespace std;
 
@@ -47,6 +48,7 @@ using namespace std;
 #define LEVEL_HEIGHT 36
 #define LEVEL_SIZE LEVEL_WIDTH*LEVEL_HEIGHT //2016
 #define DOOR_RANGE 6
+#define GROUND_FLOOR 480
 
 #define EMPTY 0
 #define SOLID 1
@@ -66,8 +68,30 @@ using namespace std;
 #define AUDIO_DEAD (char*)"/audio/dead.wav"
 #define AUDIO_CLEAR (char*)"/audio/clear.wav"
 #define AUDIO_ITEM (char*)"/audio/item.wav"
+#define AUDIO_WAVE (char*)"/audio/wave.wav"
 #define AUDIO_JUMP (char*)"/audio/trampoline.wav"
 
+class Stage;
+class Sound;
+class Control;
+class Timer;
+template <class T> class Collider;
+class Gravity;
+class Sprite;
+class GameObject;
+class Trampoline;
+class Item;
+class Wave;
+class Door;
+class Balloon;
+class Bell;
+class Player;
+class Enemy;
+class Physics;
+class Mapper;
+class Game;
+
+// class GameObjects{};
 // class FieldInterface{
 //     int m_Size;
 //     ~FieldInterface() = default;
@@ -86,7 +110,7 @@ struct Data{
     array <array<int, DOOR_SIZE>,  12> doors;
     array <array<int, LEVEL_SIZE>, 16> levels;
     array <array<int, LEVEL_SIZE>, 16> interactive;
-    array <array<int, SPRITE_SIZE>, 6> items;
+    array <array<int, SPRITE_SIZE>, 16> items;
     array <int, 12> enemies;
     array <array<int, 2>, 10> spawn;
 };
@@ -110,25 +134,8 @@ class Stage{
         Stage(int w, int h);
 };
 
-class Audio{
-    public:
-        char FileName[100];
-        SDL_AudioSpec spec;
-        Uint32 len;
-        Uint8 *buf;
-        bool priority = false;
-
-        Audio( char* file_name, bool priority_value );
-        void play();
-};
-
 class Sound{
     public:
-        // struct Library{
-        //     map< string, Mix_Music* > music;
-        //     map< string, Mix_Chunk* > effects;
-        // } library;
-
         Sound();
         void init();
 
@@ -137,6 +144,7 @@ class Sound{
                 map< string, Mix_Chunk* > library;
                 void load(string name, char* file);
                 void play(string name);
+                void loop(string name);
                 void pause();
                 void stop();
         } effects;
@@ -165,6 +173,57 @@ class Control{
 
         void input();
         void keysup();
+};
+
+class Timer{
+    vector<Uint32> timestamp;
+    vector<Uint32> duration;
+
+    public:
+        int start(Uint32 timeout);
+        bool done(int id);
+        void reset(int id);
+};
+
+template <class T>
+class Collider{
+    public:
+        int width;
+        int height;
+        int offset;
+        double x;
+        double y;
+        bool passthru;
+        T* object;
+
+    Collider(T* obj);
+    void init(double x, double y, int w, int h);
+    void update(double x, double y);
+    template <class T2>
+    bool check(Collider<T2>* collider);
+    void debug();
+};
+
+class Gravity{
+    public:
+        float gravity;
+        float buoyancy;
+        float lift;
+        float speed;
+        float delay;
+        float min;
+        float max;
+        string type;
+
+        Gravity(float factor,  int delay);
+
+        template <class T>
+        void update(T* sprite);
+        void reset();
+        template <class T>
+        void bound(T* sprite);
+        template <class T>
+        bool fallthru(T* sprite);
 };
 
 class Sprite{
@@ -213,38 +272,34 @@ class Sprite{
             flip(array<array<int, SPRITE_SIZE>, FRAMES> frames) = 0;
 };
 
-// class GameObjects{};
-
 class GameObject{
     public:
         string state;
         string type;
-        int width;
-        int height;
-        int frame;
-        int cycle;
-        int repeat;
         double x;
         double y;
-        bool animated;
-        bool loop;
-        bool assigned;
-        bool active;
-        vector<int> group;
-        vector< Coordinates > layout;
-        map< string, vector< array<array<int, TILE_SIZE>, FRAMES> > >states;
-        map<string, array<SDL_Texture*, FRAMES> > cache;
+        int    width;
+        int    height;
+        int    frame;
+        int    cycle;
+        int    repeat;
+        bool   animated;
+        bool   assigned;
+        bool   loop;
+        bool   active;
+
+        vector<int>  group;
+        SDL_Texture* cache;
 
         GameObject();
         void init();
-        void update();
+        void draw(const array<int, SPRITE_SIZE> &bits);
+        void draw(const array<int, SPRITE_SIZE> &bits, Coordinates offset);
         void render();
         void reset();
         void compile();
         void assign(int index);
-        void define(string name, vector< array<array<int, TILE_SIZE>, FRAMES> > frames);
-        void draw(const array<int, TILE_SIZE> &bits, Coordinates offset);
-        array<int, TILE_SIZE> flip(const array<int, TILE_SIZE> frames);
+        // void update();
 };
 
 class Trampoline: public GameObject{
@@ -252,15 +307,69 @@ class Trampoline: public GameObject{
         int bounces;
         string jumper;
 
+        vector< Coordinates > layout;
+        map< string, vector< array<array<int, TILE_SIZE>, FRAMES> > >states;
+        map<string, array<SDL_Texture*, FRAMES> > cache;
+
         Trampoline();
         void init();
         void assign(int index);
         void reset();
         void render();
         void bounce();
+        void clear();
+
+        void define(string name, vector< array<array<int, TILE_SIZE>, FRAMES> > frames);
+        void compile();
+        void draw(const array<int, TILE_SIZE> &bits, Coordinates offset);
+
+        array<int, TILE_SIZE>
+        flip(const array<int, TILE_SIZE> frames);
 
         vector< array<array<int, TILE_SIZE>, FRAMES> >
         changeColor(vector< array<array<int, TILE_SIZE>, FRAMES> > grouped, int color);
+};
+
+class Item: public GameObject{
+    public:
+        int  id;
+        int  points;
+        bool collected;
+
+        string state;
+        string type;
+
+        Item(int id);
+        void assign(int index);
+        void reset();
+        void compile();
+        void render();
+        void collect();
+};
+
+class Wave: public GameObject{
+    public:
+        string state;
+        int direction;
+
+        Collider<Wave> *collider;
+        vector<Enemy*> captured;
+
+        // struct Offset{
+        //     double x;
+        //     double y;
+        // } offset;
+
+        Wave(int direction);
+        void init();
+        void assign(int index);
+        void reset();
+        void render();
+        void compile();
+        void activate();
+        bool range();
+        void cleanup();
+        void update();
 };
 
 class Door: public GameObject{
@@ -279,82 +388,48 @@ class Door: public GameObject{
         map< string, vector< array<int, DOOR_SIZE> > > states;
         map<string,  vector<SDL_Texture*> > cache;
 
+        Wave wave;
+
         Door(int id);
-        void init();
         void assign(int index);
         void define(string name, vector< array<int, DOOR_SIZE> > frames);
+        void draw(const array<int, DOOR_SIZE> &bits);
         void reset();
         void render();
         void compile();
-        void draw(const array<int, DOOR_SIZE> &bits);
         void operate(int index);
         bool range();
         void knockout();
         void shockwave();
+        void cleanup();
 
         vector< array<int, DOOR_SIZE> > flip(const vector< array<int, DOOR_SIZE> > frames);
 };
 
-class Item: public GameObject{
+class Balloon: public GameObject{
     public:
-        int  id;
-        int  points;
-        bool collected;
-
         string state;
         string type;
 
-        SDL_Texture* cache;
+        Balloon();
+        void init(int index);
+        void reset();
+        void render();
+        void compile();
+        void cleanup();
+};
 
-        Item(int id);
-        void init();
+class Bell: public GameObject{
+    public:
+        string state;
+
+        Bell();
+        void init(int index);
         void assign(int index);
         void reset();
-        void compile();
-        void draw(const array<int, SPRITE_SIZE> &bits);
         void render();
-        void collect();
-};
-
-template <class T>
-class Collider{
-    public:
-        int width;
-        int height;
-        int offset;
-        double x;
-        double y;
-        bool passthru;
-        T* object;
-
-    Collider(T* obj);
-    void init(double x, double y, int w, int h);
-    void update(double x, double y);
-    template <class T2>
-    bool check(Collider<T2>* collider);
-    void debug();
-};
-
-class Gravity{
-    public:
-        float gravity;
-        float buoyancy;
-        float lift;
-        float speed;
-        float delay;
-        float min;
-        float max;
-        string type;
-
-        Gravity(float factor,  int delay);
-
-        template <class T>
-        void update(T* sprite);
-        void reset();
-        template <class T>
-        void bound(T* sprite);
-        template <class T>
-        bool fallthru(T* sprite);
+        void compile();
+        void cleanup();
 };
 
 class Player: public Sprite{
@@ -413,6 +488,8 @@ class Enemy: public Sprite{
     public:
         double x;
         double y;
+        double slide;
+        int id;
         int width;
         int height;
         int frame;
@@ -423,21 +500,22 @@ class Enemy: public Sprite{
         bool bouncing;
         bool ko;
         bool animated;
-        // bool passthru;
-        // Uint32 current;
+        bool captured;
+
         Uint32 timestamp;
         string direction;
         string state;
         string type;
         string mode;
         map< string, array<array<int, SPRITE_SIZE>, FRAMES> > states;
-        map<string, array<SDL_Texture*, FRAMES> > cache;
+        map<string, array<SDL_Texture*, FRAMES> >* cache;
 
         Collider<Enemy> *collider;
         Gravity *gravity;
 
         Enemy();
         // ~Enemy();
+        bool operator!=(const Enemy &other){ return id != other.id; }
         virtual void init(double x, double y);
         virtual void move();
         virtual void update();
@@ -461,7 +539,7 @@ class Enemy: public Sprite{
         void draw(const array<int, SPRITE_SIZE> &bits);
         void compile();
         void koed();
-        bool collision(Collider<Player> complement);
+        // bool collision(Collider<Player> complement);
         void wander();
         void pursue();
         void decision();
@@ -470,10 +548,13 @@ class Enemy: public Sprite{
         void hop(int i);
         bool aligned();
         void trampoline();
-        void knockedout(int direction);
+        void knockedout(int direction, double door_x);
         void reset(double x, double y);
         void respawn();
+        void capture(int direction);
+        void release();
 };
+
 
 class Physics{
     public:
@@ -517,6 +598,7 @@ class Game{
         int  pickup;
         int  factor;
         int  lives;
+        int  timeout;
         Uint32 timestamp;
 
         struct Center{
@@ -535,9 +617,10 @@ class Game{
         // } state;
 
         Control controls;
-        Stage stage;
-        Mapper mapper;
-        Sound  sound;
+        Stage   stage;
+        Mapper  mapper;
+        Sound   sound;
+        Timer   timer;
 
         vector<int>   skip;
         vector<int>   collected;
@@ -545,25 +628,21 @@ class Game{
         vector<Item>  items;
         vector<Door>  doors;
         vector<Trampoline> trampolines;
-
-        // map< string, Audio* > sounds;
-        // map< string, Mix_Music* > sounds;
+        vector<const char *> cached;
 
         struct Cache{
             map<string, array<SDL_Texture*, FRAMES> > enemy;
             map<string, array<SDL_Texture*, FRAMES> > trampoline;
-            map<string, vector<SDL_Texture*> > door;
+            map<int, map<string, vector<SDL_Texture*> > > door;
             map<string, SDL_Texture*> item;
             array<SDL_Texture*, 16> background;
         } cache;
-
-        // map< string, vector<Trampoline> > objects;
 
         Game();
         void init(int w, int h);
         void update();
         void render();
-        bool delay();
+        bool interval();
         bool delay(int delay, Uint32 start);
         void setup();
         void renderObjects();
@@ -576,6 +655,7 @@ class Game{
         void complete();
         void start();
         void pause();
+        void compile();
 };
 
 // *************
@@ -607,16 +687,15 @@ extern Game    game;
 extern Physics physics;
 extern Player  player;
 extern Enemy   enemy;
-extern struct Data data;
-extern SDL_AudioDeviceID device_id;
+extern struct  Data data;
 
 extern Uint32 last_time;
 extern Uint32 current_time;
 extern Uint32 ms_per_frame;
 
-extern SDL_Window *window;
+extern SDL_Window   *window;
 extern SDL_Renderer *renderer;
-extern SDL_Event event;
+extern SDL_Event     event;
 
 // extern struct Coordinates;
 // extern Uint32 last_frame_time;

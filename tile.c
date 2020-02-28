@@ -26,12 +26,13 @@ void Mapper::compile(int level){
 
             this->x = col*BYTE*SCALE;
             this->y = row*BYTE*SCALE;
-            this->draw(data.tiles[data.levels[level-1][i]]);
+            this->draw(data.tiles[data.levels[level][i]]);
         }
     }
-    this->background[level-1] = texture;
+    this->background[level] = texture;
 
     SDL_SetRenderTarget(renderer, NULL);
+    cout << "level " << level+1 << endl;
 }
 
 void Mapper::render(){

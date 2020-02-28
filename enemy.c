@@ -15,8 +15,8 @@ Enemy::Enemy() : Sprite(){
     define("hop-right", flip(f1));
     define("drop", f2);
     define("bound", f2);
-    define("ko-left", f3);
-    define("ko-right", flip(f3));
+    define("ko-left", flip(f3));
+    define("ko-right", f3);
 
     this->width  = DIM;
     this->height = DIM;
@@ -30,8 +30,9 @@ Enemy::Enemy() : Sprite(){
     this->type        = "enemy";
     this->frame       = 0;
     this->bounces     = -1;
-    // this->dead = false;
+    this->captured    = false;
     this->collider = new Collider<Enemy>(this);
+    this->cache = &game.cache.enemy;
 
     this->compile();
 };
@@ -112,7 +113,7 @@ void Enemy::define(string name, array<array<int, SPRITE_SIZE>, FRAMES> frames){
 }
 
 void Enemy::update(){
-    if(state!="ko-left" && state!="ko-right"){
+    if(state!="ko-left" && state!="ko-right" && !captured){
         if(this->falling && state!="hop-right" && state!="hop-left"){
             this->state = "drop";
             this->collider->passthru = true;
@@ -132,10 +133,28 @@ void Enemy::update(){
             this->state = this->direction;
             this->collider->passthru = false;
         }
+
         walk();
         collider->update(x+game.offset.x, y+game.offset.y);
     }
+    else if(captured){
+        if(state == "right"){
+            x -= SPEED;
+            collider->passthru = true;
+        }
+        else if(state == "left"){
+            x += SPEED;
+            collider->passthru = true;
+        }
+    }
     else{
+        if(state=="ko-left" && x>slide){
+            x -= ENEMY_SPEED;
+        }
+        else if(state=="ko-right" && x<slide){
+            x += ENEMY_SPEED;
+        }
+
         this->collider->passthru = true;
         if(game.delay(5000, timestamp)){
             return;
@@ -167,65 +186,65 @@ void Enemy::render(){
             frame++;
         }
     }
-    SDL_SetTextureBlendMode(cache[state][frame], SDL_BLENDMODE_BLEND);
-    SDL_RenderCopy(renderer, cache[state][frame], &src, &dest);
+    SDL_SetTextureBlendMode((*cache)[state][frame], SDL_BLENDMODE_BLEND);
+    SDL_RenderCopy(renderer, (*cache)[state][frame], &src, &dest);
 }
 
 void Enemy::compile(){
-    for(map< string, array< array<int, SPRITE_SIZE>, FRAMES> >::iterator it=states.begin(); it!=states.end(); ++it){
-        string s = it->first;
-        array<SDL_Texture*, FRAMES> images;
-        // it->second[f].size()
-        for(int f=0; f<FRAMES; f++){
-            SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width*SCALE, height*SCALE);
-            SDL_SetRenderTarget(renderer, texture);
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+    if(!contains(game.cached, "enemy")){
+        for(map< string, array< array<int, SPRITE_SIZE>, FRAMES> >::iterator it=states.begin(); it!=states.end(); ++it){
+            string s = it->first;
+            array<SDL_Texture*, FRAMES> images;
+            // it->second[f].size()
+            for(int f=0; f<FRAMES; f++){
+                SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width*SCALE, height*SCALE);
+                SDL_SetRenderTarget(renderer, texture);
+                SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
-            // for(int i=0; i<layout.size(); i++){
-            draw(it->second[f]);
-            // }
+                // for(int i=0; i<layout.size(); i++){
+                draw(it->second[f]);
+                // }
 
-            images[f] = texture;
-            // throw exception();
-            // SDL_SetRenderTarget(renderer, NULL);
+                images[f] = texture;
+                // throw exception();
+                // SDL_SetRenderTarget(renderer, NULL);
+            }
+            cache->insert(make_pair(s, images));
         }
-        this->cache.insert(make_pair(s, images));
+        SDL_SetRenderTarget(renderer, NULL);
+        game.cached.push_back("enemy");
     }
-    SDL_SetRenderTarget(renderer, NULL);
 }
 
-bool Enemy::collision(Collider<Player> complement){
-
-    return true;
-}
+// bool Enemy::collision(Collider<Player> complement){return true;}
 
 void Enemy::deaded(){}
 
-void Enemy::knockedout(int direction){
+void Enemy::knockedout(int direction, double door_x){
     if(direction==LEFT){
-        state = "ko-left";
-        collider->passthru = true;
-        // collider->object->passthru = true;
-        x += DIM*SCALE;
-    }
-    else if(direction==RIGHT){
         state = "ko-right";
         collider->passthru = true;
-        // collider->object->passthru = true;
-        x -= DIM*SCALE;
+        slide = door_x + DIM*SCALE*3;
+    }
+    else if(direction==RIGHT){
+        state = "ko-left";
+        collider->passthru = true;
+        slide = door_x - DIM*SCALE*3;
     }
     timestamp = SDL_GetTicks();
 }
 
 void Enemy::respawn(){
-    this->falling  = false;
-    this->bouncing = false;
-    this->direction = "left";
-    this->state = "left";
-    this->frame = 0;
-    this->animated = true;
+    // cout << "respawn" << endl;
     this->x = game.center.x;
     this->y = 120;
+    this->frame = 0;
+    this->falling  = true;
+    this->bouncing = false;
+    this->animated = true;
+    this->captured = false;
+    this->direction = rand()%2 ? "left" : "right";
+    this->state = direction=="left" ? "left" : "right";
     this->collider->update(x+game.offset.x, y+game.offset.y);
     this->collider->passthru = false;
 }
@@ -441,7 +460,7 @@ void Enemy::hopoff(){
     falling = false;
     collider->passthru = true;
 
-    if(game.delay()){ return; };
+    if(!game.interval()){ return; };
 
     if(traverse(DOWN)){
         if(direction=="left" && traverse(LEFT)){
@@ -536,7 +555,7 @@ void Enemy::bounce(){
         bounces = rand()%3;
     }
     else{
-        if(game.delay()){
+        if(!game.interval()){
             return;
         }
         if(bounces>0){
@@ -612,4 +631,28 @@ void Enemy::reset(double x, double y){
     this->collider->passthru = false;
     // this->collider->init(x + game.offset.x, y + game.offset.y, width, height);
     // this->collider->update(x+4+game.offset.x, y+game.offset.y);
+}
+
+void Enemy::capture(int direction){
+    if(direction==LEFT){
+        state = "right";
+        animated = false;
+        captured = true;
+        collider->passthru = true;
+        gravitation = false;
+    }
+    else{
+        state = "left";
+        animated = false;
+        captured = true;
+        collider->passthru = true;
+        gravitation = false;
+    }
+}
+
+void Enemy::release(){
+    // cout << " release" << endl;
+    gravitation = true;
+    captured = false;
+    respawn();
 }
