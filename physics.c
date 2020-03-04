@@ -79,7 +79,7 @@ void Gravity::update(T* sprite){
             if(!sprite->bouncing){
                 sprite->align();
 
-                if(sprite->type=="player"){
+                if(sprite->type=="player" && game.state!="BONUS_ROUND"){
                     for(int t=0; t<game.trampolines.size(); t++){
                         game.trampolines[t].clear();
                     }
@@ -104,8 +104,7 @@ void Gravity::update(T* sprite){
                     game.trampolines[t].jumper = sprite->type;
 
                     if(game.trampolines[t].bounces<BOUNCES && !game.trampolines[t].active){
-                        game.trampolines[t].active = true;
-                        bound(sprite);
+                        bound(sprite, game.trampolines[t]);
                     }
                     else if(game.trampolines[t].active){
                         // pass
@@ -114,10 +113,17 @@ void Gravity::update(T* sprite){
                         sprite->deaded();
                     }
                     else if(sprite->type=="enemy" && sprite->y>GROUND_FLOOR){
-                        game.trampolines[t].active = true;
-                        bound(sprite);
+                        bound(sprite, game.trampolines[t]);
                     }
                 }
+            }
+        }
+        else if(tile==SOLID && game.state=="BONUS_ROUND"){
+            if(!sprite->adjacent(RIGHT)){
+                sprite->x += SPEED;
+            }
+            else if(!sprite->adjacent(LEFT)){
+                sprite->x -= SPEED;
             }
         }
 
@@ -142,9 +148,10 @@ void Gravity::update(T* sprite){
                 }
             }
 
-            if(tile!=EMPTY && !broken){
+            if(tile!=BALLOON && tile!=EMPTY && !broken){
                 lift = 0;
-                sprite->state = "turn";
+                if(sprite->type=="player")
+                    sprite->state = "turn";
                 sprite->falling = true;
                 sprite->bouncing = false;
             }
@@ -157,19 +164,22 @@ void Gravity::reset(){
 }
 
 template <class T>
-void Gravity::bound(T* sprite){
+void Gravity::bound(T* sprite, Trampoline trampoline){
+    trampoline.active = true;
+    sprite->trampoline = trampoline;
+
     sprite->falling = false;
     sprite->bouncing = true;
 
-    sprite->align(true);
+    // sprite->align(true);
     sprite->bounce();
 
     if(lift==0){
-        lift = max*2;
+        lift = max*(game.state=="BONUS_ROUND" ? 3 : 2);
     }
 
-    if(sprite->type=="player")
-        game.sound.effects.play("trampoline");
+    if(sprite->type=="player" && !game.sound.effects.playing(6))
+        game.sound.effects.play("trampoline", 6);
 };
 
 
@@ -211,7 +221,7 @@ void Collider<T>::debug(){
 template <class T>
 template <class T2>
 bool Collider<T>::check(Collider<T2>* collider){
-    if(this->passthru || collider->passthru){
+    if(this->passthru || (collider->passthru && object->type!="wave")){
         return false;
     }
 

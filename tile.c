@@ -16,6 +16,7 @@ void Mapper::compile(){
     for(int i=0; i<data.tiles.size(); i++){
         texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, BYTE*SCALE, BYTE*SCALE);
         SDL_SetRenderTarget(renderer, texture);
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
         this->draw(data.tiles[i]);
 
@@ -49,8 +50,7 @@ void Mapper::compile(){
                 src.w = BYTE*SCALE;
                 src.h = BYTE*SCALE;
 
-
-
+                SDL_SetTextureBlendMode(game.cache.tiles[data.levels[level][i]], SDL_BLENDMODE_BLEND);
                 SDL_RenderCopy(renderer, game.cache.tiles[data.levels[level][i]], &src, &dest);
             }
         }
@@ -58,9 +58,44 @@ void Mapper::compile(){
 
         SDL_SetRenderTarget(renderer, NULL);
     }
+
+    for(int level=0; level<data.foreground.size(); level++){
+        // cout << "level " << level+1 << endl;
+
+        texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET,
+                                    LEVEL_WIDTH*BYTE*SCALE, LEVEL_HEIGHT*BYTE*SCALE);
+
+        SDL_SetRenderTarget(renderer, texture);
+
+        for(int i=0; i<data.foreground[level].size(); i++){
+            if(i){
+                col = i % LEVEL_WIDTH;
+                row = floor(i / LEVEL_WIDTH);
+
+                this->x = col*BYTE*SCALE;
+                this->y = row*BYTE*SCALE;
+
+                dest.x = x;
+                dest.y = y;
+                dest.w = BYTE*SCALE;
+                dest.h = BYTE*SCALE;
+
+                src.x = 0;
+                src.y = 0;
+                src.w = BYTE*SCALE;
+                src.h = BYTE*SCALE;
+
+                SDL_SetTextureBlendMode(game.cache.tiles[data.foreground[level][i]], SDL_BLENDMODE_BLEND);
+                SDL_RenderCopy(renderer, game.cache.tiles[data.foreground[level][i]], &src, &dest);
+            }
+        }
+        this->foreground[level] = texture;
+
+        SDL_SetRenderTarget(renderer, NULL);
+    }
 }
 
-void Mapper::render(){
+void Mapper::render(string layer){
     SDL_Rect dest, src;
     dest.x = game.offset.x;
     dest.y = 0;
@@ -72,7 +107,14 @@ void Mapper::render(){
     src.w = LEVEL_WIDTH*BYTE*SCALE;
     src.h = LEVEL_HEIGHT*BYTE*SCALE;
 
-    SDL_RenderCopy(renderer, background[game.level-1], &src, &dest);
+    if(layer=="background"){
+        SDL_SetTextureBlendMode(background[game.level-1], SDL_BLENDMODE_BLEND);
+        SDL_RenderCopy(renderer, background[game.level-1], &src, &dest);
+    }
+    else if(layer=="foreground"){
+        SDL_SetTextureBlendMode(foreground[game.level-1], SDL_BLENDMODE_BLEND);
+        SDL_RenderCopy(renderer, foreground[game.level-1], &src, &dest);
+    }
 }
 
 void Mapper::draw(const array<int, TILE_SIZE> &bits){
@@ -98,6 +140,37 @@ void Mapper::draw(const array<int, TILE_SIZE> &bits){
             r.y = w*row;
             r.w = w;
             r.h = w;
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, alpha);
+            SDL_RenderFillRect(renderer, &r );
+        }
+    }
+}
+
+void Mapper::draw(const array<int, SPRITE_SIZE> &bits, Coordinates offset){
+    string color;
+    SDL_Rect r;
+
+    int w = SCALE;
+    int row;
+    int col;
+    int bit;
+    int alpha = 255;
+
+    for(int i=0; i < SPRITE_SIZE; i++) {
+        bit = bits[i];
+        if(bit){
+            color = data.palette[bit];
+            SDL_Color c = hex2sdl(color);
+
+            col = i % DIM;
+            row = floor(i / DIM);
+
+            r.x = offset.x + w*col;
+            r.y = offset.y + w*row;
+            r.w = w;
+            r.h = w;
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
             SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, alpha);
             SDL_RenderFillRect(renderer, &r );
         }

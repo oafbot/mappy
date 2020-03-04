@@ -310,13 +310,19 @@ Trampoline::changeColor(vector< array<array<int, TILE_SIZE>, FRAMES> > grouped, 
     return replace;
 }
 
+int Trampoline::tier(){
+    int row = group[0]/LEVEL_HEIGHT;
+    return game.tiers-((row-10)/game.tiers);
+}
+
+
 void Trampoline::reset(){
     this->cycle = 0;
     this->frame = 5;
     this->animated = false;
     this->active = false;
 
-    if(game.RESET){
+    if(game.RESET || game.COMPLETE){
         state = "green";
     }
 }
@@ -423,7 +429,6 @@ void Item::compile(){
 void Item::render(){
     if(!collected){
         GameObject::render();
-
     }
 }
 
@@ -457,8 +462,9 @@ void Item::reset(){}
 // Door
 // -----------
 
-Door::Door(int id) : wave(RIGHT){
+Door::Door(int id, int uid) : wave(RIGHT, uid){
     this->id       = id;
+    this->uid      = uid;
     this->state    = "closed";
     this->frame    = 0;
     this->width    = 3*BYTE;
@@ -514,7 +520,7 @@ Door::Door(int id) : wave(RIGHT){
             direction = RIGHT;
             offset.x = BYTE*SCALE;
             offset.y = -2*BYTE*SCALE;
-            wave = * new Wave(RIGHT);
+            wave = * new Wave(RIGHT, uid);
             break;
         case MAGIC_DOOR_L:
             define("closed",  flip(magic_closed));
@@ -525,7 +531,7 @@ Door::Door(int id) : wave(RIGHT){
             direction = LEFT;
             offset.x = -BYTE*SCALE;
             offset.y = -2*BYTE*SCALE;
-            wave = * new Wave(LEFT);
+            wave = * new Wave(LEFT, uid);
             break;
     }
 
@@ -744,7 +750,10 @@ void Door::shockwave(){
 // Wave
 // -----------
 
-Wave::Wave(int d){
+Wave::Wave(int d, int id){
+    type = "wave";
+    id = id;
+    channel = -1;
     direction = d;
     collider = new Collider<Wave>(this);
     collider->init(x+game.offset.x, y+game.offset.y, DIM*SCALE, DIM*SCALE-BYTE);
@@ -810,12 +819,11 @@ void Wave::update(){
         }
         else{
             active = false;
-            // for(auto c : captured) { c.respawn(); }
             for(int i=0; i<captured.size(); i++){
                 captured[i]->release();
             }
             captured.clear();
-            game.sound.effects.stop();
+            game.sound.effects.stop(channel);
         }
         collider->update(x+game.offset.x, y+game.offset.y+BYTE*SCALE);
     }
@@ -836,9 +844,10 @@ void Wave::compile(){
 }
 
 bool Wave::range(){return true;}
+
 void Wave::activate(){
     active = true;
-    game.sound.effects.loop("wave" );
+    channel = game.sound.effects.loop("wave");
 }
 
 void Wave::reset(){
@@ -848,6 +857,10 @@ void Wave::reset(){
 void Wave::cleanup(){
     group.clear();
     assigned = false;
+    if(game.sound.effects.playing(channel)){
+        game.sound.effects.stop(channel);
+    }
+    channel = -1;
 }
 
 
@@ -855,6 +868,89 @@ void Wave::cleanup(){
 // Balloon
 // -----------
 
+Balloon::Balloon(){
+    type     = "balloon";
+    assigned  = false;
+    collected = false;
+    animated  = true;
+    points    = 200;
+    cache = &game.cache.balloon;
+    frames = {data.items[6], data.items[6], data.items[7], data.items[7]};
+    compile();
+}
+
+void Balloon::assign(int index){
+    group.push_back(index);
+    group.push_back(index+1);
+    group.push_back(index+LEVEL_WIDTH);
+    group.push_back(index+LEVEL_WIDTH+1);
+    assigned = true;
+    active = true;
+    init();
+}
+
+void Balloon::compile(){
+    if(!contains(game.cached, type)){
+        for(int f=0; f<frames.size(); f++){
+            SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width*SCALE, height*SCALE);
+            SDL_SetRenderTarget(renderer, texture);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+
+            draw(frames[f]);
+
+            (*cache)[f] = texture;
+        }
+
+        SDL_SetRenderTarget(renderer, NULL);
+        game.cached.push_back(type);
+    }
+}
+
+void Balloon::render(){
+    if(active){
+        SDL_Rect dest, src;
+
+        dest.x = game.offset.x + x;
+        dest.y = game.offset.y + y;
+
+        dest.w = width*SCALE;
+        dest.h = height*SCALE;
+
+        src.x = 0;
+        src.y = 0;
+        src.w = width*SCALE;
+        src.h = height*SCALE;
+
+        frame = animated && frame<frames.size()-1 ? frame+1 : 0;
+
+        SDL_SetTextureBlendMode((*cache)[frame], SDL_BLENDMODE_BLEND);
+        SDL_RenderCopy(renderer, (*cache)[frame], &src, &dest);
+    }
+}
+
+void Balloon::collect(){
+    collected = true;
+    active    = false;
+    game.sound.effects.play("item");
+
+    game.score += points;
+
+    // game.collected.push_back(id);
+
+    // if(game.collected.size()==10){
+    //     game.timestamp = SDL_GetTicks();
+    // }
+
+    cout<< "score: " << game.score << endl;
+}
+
+void Balloon::cleanup(){
+    assigned = false;
+    collected = false;
+    active = false;
+}
+
+void Balloon::reset(){}
 
 
 // -----------

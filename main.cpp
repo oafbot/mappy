@@ -1,6 +1,7 @@
 #include "game.hpp"
 #include "audio.c"
 #include "data.c"
+#include "text.c"
 #include "sprite.c"
 #include "player.c"
 #include "enemy.c"

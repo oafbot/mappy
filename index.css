@@ -22,6 +22,8 @@ body {
     margin-right: auto;
     margin-bottom: 10px;
     display: block;
+    /*background-color: '#0078F8';*/
+    border-radius: 5px;
 }
 
 /*.em_textarea{

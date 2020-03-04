@@ -37,16 +37,14 @@ void Control::input(){
                     case SDLK_UP:
                         this->up_key_down = true;
                         this->key_down = true;
+                        player.door();
                         break;
                     case SDLK_DOWN:
                         this->down_key_down = true;
                         this->key_down = true;
-
-
                         break;
                     case SDLK_z:
                     case SDLK_LSHIFT:
-                    case SDLK_RSHIFT:
                         player.door();
                         break;
                     case SDLK_SPACE:

@@ -15,6 +15,13 @@
     var canvas = null;
     var ctx = null;
 
+    function ModuleLoading(){
+      canvas = document.getElementById('canvas');
+      ctx = canvas.getContext("2d");
+      ctx.fillStyle = '#0078F8';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
     function ModuleLoaded() {
       canvas = document.getElementById('canvas');
       ctx = canvas.getContext("2d");

@@ -15,8 +15,7 @@ int Timer::start(Uint32 timeout){
 
 bool Timer::done(int id){
     Uint32 delta = SDL_GetTicks() - timestamp[id];
-    cout << id << " " << duration[id] << " " << delta << endl;
-
+    // cout << id << " " << duration[id] << " " << delta << endl;
     if(delta < duration[id]){
         return false;
     }

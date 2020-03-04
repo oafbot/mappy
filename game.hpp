@@ -20,7 +20,10 @@
 #include <set>
 
 using namespace std;
-
+#define PLAY 1
+#define DISPLAY 0
+#define ON  1
+#define OFF 0
 #define FRAME_COUNT 7
 #define SCALE 2
 #define DIM 16
@@ -63,8 +66,12 @@ using namespace std;
 #define PAINTING 10
 #define SAFE 11
 #define BELL 12
+#define BALLOON 13
 
 #define AUDIO_THEME (char*)"/audio/theme.wav"
+#define AUDIO_BONUS (char*)"/audio/bonus.wav"
+#define AUDIO_FANFARE (char*)"/audio/fanfare.wav"
+#define AUDIO_RESULTS (char*)"/audio/results.wav"
 #define AUDIO_DEAD (char*)"/audio/dead.wav"
 #define AUDIO_CLEAR (char*)"/audio/clear.wav"
 #define AUDIO_ITEM (char*)"/audio/item.wav"
@@ -73,6 +80,7 @@ using namespace std;
 
 class Stage;
 class Sound;
+class Text;
 class Control;
 class Timer;
 template <class T> class Collider;
@@ -106,12 +114,16 @@ struct Data{
     array <string, 56> palette;
     array <array<int, SPRITE_SIZE>, BITMAP_SIZE> sprites;
     array <array<int, TILE_SIZE>,   BITMAP_SIZE> trampoline;
-    array <array<int, TILE_SIZE>,  21> tiles;
+    array <array<int, TILE_SIZE>, 128> tiles;
     array <array<int, DOOR_SIZE>,  12> doors;
     array <array<int, LEVEL_SIZE>, 16> levels;
     array <array<int, LEVEL_SIZE>, 16> interactive;
+    array <array<int, LEVEL_WIDTH*8>, 16> foreground;
     array <array<int, SPRITE_SIZE>, 16> items;
-    array <int, 12> enemies;
+    array <array<int, TILE_SIZE>, 42> alpha;
+    array <array<int, SPRITE_SIZE>, 32> scores;
+    array <array<int, 4096>, 3> title;
+    array <int, 16> enemies;
     array <array<int, 2>, 10> spawn;
 };
 
@@ -142,12 +154,17 @@ class Sound{
         class Effects{
             public:
                 map< string, Mix_Chunk* > library;
+                map< string, int > channels;
                 void load(string name, char* file);
-                void play(string name);
-                void loop(string name);
+                int  play(string name);
+                void play(string name, int channel);
+                int  loop(string name);
+                void loop(string name, int channel);
                 void pause();
                 void stop();
+                void stop(int channel);
                 void resume();
+                bool playing(int channel);
         } effects;
 
         class Music{
@@ -160,7 +177,38 @@ class Sound{
                 void pause();
                 void stop();
                 void resume();
+                bool playing();
         } music;
+};
+
+class Text{
+    public:
+        int  height;
+        int  width;
+        int  kern;
+        int  unit;
+        int  cols;
+        int  rows;
+        bool visible;
+        bool blink;
+
+        struct TextBox{
+            int width;
+            int height;
+        } box;
+
+        vector<int> colors;
+        // vector< array<SDL_Texture*, 42> > cache;
+        map< int, map<char, SDL_Texture*> > alpha;
+
+        Text();
+        void init(vector<int> c, int w, int h);
+        void compile();
+        void draw(const array<int, TILE_SIZE> &bits, int color);
+        void render(string text, int color, Coordinates offset);
+        void render(string text, int color, int col, int row);
+        void center(string text, int color, int row);
+        // void color(int color);
 };
 
 class Control{
@@ -222,7 +270,7 @@ class Gravity{
         void update(T* sprite);
         void reset();
         template <class T>
-        void bound(T* sprite);
+        void bound(T* sprite, Trampoline trampoline);
         template <class T>
         bool fallthru(T* sprite);
 };
@@ -323,12 +371,14 @@ class Trampoline: public GameObject{
         void define(string name, vector< array<array<int, TILE_SIZE>, FRAMES> > frames);
         void compile();
         void draw(const array<int, TILE_SIZE> &bits, Coordinates offset);
+        int  tier();
 
         array<int, TILE_SIZE>
         flip(const array<int, TILE_SIZE> frames);
 
         vector< array<array<int, TILE_SIZE>, FRAMES> >
         changeColor(vector< array<array<int, TILE_SIZE>, FRAMES> > grouped, int color);
+
 };
 
 class Item: public GameObject{
@@ -352,6 +402,8 @@ class Wave: public GameObject{
     public:
         string state;
         int direction;
+        int id;
+        int channel;
 
         Collider<Wave> *collider;
         vector<Enemy*> captured;
@@ -361,7 +413,7 @@ class Wave: public GameObject{
         //     double y;
         // } offset;
 
-        Wave(int direction);
+        Wave(int direction, int id);
         void init();
         void assign(int index);
         void reset();
@@ -381,6 +433,7 @@ class Door: public GameObject{
         bool   open;
         int    direction;
         int    id;
+        int    uid;
 
         struct Offset{
             double x;
@@ -392,7 +445,7 @@ class Door: public GameObject{
 
         Wave wave;
 
-        Door(int id);
+        Door(int id, int uid);
         void assign(int index);
         void define(string name, vector< array<int, DOOR_SIZE> > frames);
         void draw(const array<int, DOOR_SIZE> &bits);
@@ -412,13 +465,18 @@ class Balloon: public GameObject{
     public:
         string state;
         string type;
+        int    points;
+        bool   collected;
+        array< array<int, SPRITE_SIZE>, 4> frames;
+        array<SDL_Texture*, 4>* cache;
 
         Balloon();
-        void init(int index);
+        void assign(int index);
         void reset();
         void render();
         void compile();
         void cleanup();
+        void collect();
 };
 
 class Bell: public GameObject{
@@ -456,6 +514,7 @@ class Player: public Sprite{
 
         Collider<Player> *collider;
         Gravity *gravity;
+        Trampoline trampoline;
 
         Player();
         virtual void init(double x, double y);
@@ -497,6 +556,7 @@ class Enemy: public Sprite{
         int frame;
         int tier;
         int bounces;
+        bool active;
         bool gravitation;
         bool falling;
         bool bouncing;
@@ -512,8 +572,10 @@ class Enemy: public Sprite{
         map< string, array<array<int, SPRITE_SIZE>, FRAMES> > states;
         map<string, array<SDL_Texture*, FRAMES> >* cache;
 
+
         Collider<Enemy> *collider;
         Gravity *gravity;
+        Trampoline trampoline;
 
         Enemy();
         // ~Enemy();
@@ -549,12 +611,13 @@ class Enemy: public Sprite{
         void hopoff();
         void hop(int i);
         bool aligned();
-        void trampoline();
+        void jump();
         void knockedout(int direction, double door_x);
         void reset(double x, double y);
         void respawn();
         void capture(int direction);
         void release();
+        void deactivate();
 };
 
 
@@ -576,12 +639,14 @@ class Mapper{
         double x;
         double y;
         array<SDL_Texture*, 16> background;
+        array<SDL_Texture*, 16> foreground;
 
         Mapper();
         void init();
         void compile();
-        void render();
+        void render(string layer);
         void draw(const array<int, TILE_SIZE> &data);
+        void draw(const array<int, SPRITE_SIZE> &bits, Coordinates offset);
 };
 
 class Game{
@@ -593,6 +658,8 @@ class Game{
         bool GAME_OVER;
         bool START;
         bool scrolling;
+        bool music;
+        int  mode;
         int  level;
         int  tiers;
         int  score;
@@ -623,6 +690,7 @@ class Game{
         Mapper  mapper;
         Sound   sound;
         Timer   timer;
+        Text    text;
 
         vector<int>   skip;
         vector<int>   collected;
@@ -630,6 +698,7 @@ class Game{
         vector<Item>  items;
         vector<Door>  doors;
         vector<Trampoline> trampolines;
+        vector<Balloon> balloons;
         vector<string> cached;
 
         struct Cache{
@@ -638,6 +707,7 @@ class Game{
             map<string, map<string, vector<SDL_Texture*> > > door;
             map<string, SDL_Texture*> item;
             vector<SDL_Texture*> tiles;
+            array<SDL_Texture*, 4> balloon;
             array<SDL_Texture*, 16> background;
         } cache;
 
@@ -658,6 +728,11 @@ class Game{
         void complete();
         void start();
         void pause();
+        void playBGM();
+        void stopBGM();
+        void results();
+        void interlude();
+        bool isBonusRound(int lvl);
 };
 
 // *************

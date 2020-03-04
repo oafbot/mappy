@@ -111,6 +111,9 @@ bool Player::traverse(int direction){
                 break;
         }
     }
+    if(tile==BALLOON){
+        return true;
+    }
     return false;
 }
 
@@ -140,6 +143,9 @@ bool Player::traverse(int direction, double x, double y){
                 }
                 break;
         }
+    }
+    if(tile==BALLOON){
+        return true;
     }
     return false;
 }
@@ -375,6 +381,14 @@ void Player::collect(){
             }
         }
     }
+
+    else if(tile==BALLOON){
+        for(int i=0; i<game.balloons.size(); i++){
+            if(contains(game.balloons[i].group, pos) && !game.balloons[i].collected){
+                game.balloons[i].collect();
+            }
+        }
+    }
 }
 
 void Player::render(){
@@ -408,7 +422,7 @@ void Player::deaded(){
         game.controls.lock = true;
         game.lives -= 1;
         timestamp = SDL_GetTicks();
-        game.sound.music.stop();
+        game.stopBGM();
         game.sound.effects.play("dead");
     }
 }
