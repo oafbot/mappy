@@ -550,8 +550,8 @@ void Enemy::decision(){
 void Enemy::bounce(){
     if(bounces==-1){
         int t = trampoline.tier();
-        tier = rand()%(game.tiers-t) + t;
-        // cout << tier << endl;
+        tier = t + rand()%(game.tiers-t);
+        // if(type=="boss"){ cout << tier << endl; }
         bounces = rand()%3;
     }
     else{
@@ -565,11 +565,15 @@ void Enemy::bounce(){
 }
 
 void Enemy::jump(){
-    int row = index(x, y)/LEVEL_HEIGHT;
-    int pos = game.tiers-((row-10)/game.tiers);
-    int plyr = player.index(player.x, player.y)/LEVEL_HEIGHT;
+    int row  = LEVEL_HEIGHT-(index(x, y)/LEVEL_WIDTH); //index(x, y)/LEVEL_HEIGHT;
+    // cout << row << " / " << FLOOR_HEIGHT << " = " << (row/FLOOR_HEIGHT) << endl;
+    int pos  = (row/FLOOR_HEIGHT); //game.tiers-((row-10)/game.tiers);
+    int plyr = LEVEL_HEIGHT-(player.index(player.x, player.y)/LEVEL_WIDTH); //player.index(player.x, player.y)/LEVEL_HEIGHT;
 
-    if(row==plyr){
+    // cout << "player: " << plyr << endl;
+    // cout << "pos: " << pos << endl;
+
+    if(type!="boss" && row==plyr){
         if(player.x < x){
             direction = "left";
             state = "hop-left";

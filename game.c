@@ -22,11 +22,11 @@ Game::Game() : stage(0,0){
     this->scrolling = true;
     this->offset.x  = -182;
     this->offset.y  = 0;
-    this->tiers     = 6;
     this->score     = 0;
     this->pickup    = -1;
     this->factor    = 2;
     this->lives     = 3;
+    this->tiers     = FLOORS;
     this->mapper    = * new Mapper();
     this->controls  = * new Control();
     this->sound     = * new Sound();
@@ -505,6 +505,7 @@ void Game::restage(){
 
         if(!isBonusRound(level)){
             state="RUNNING";
+            if(level>3) tiers = FLOORS + 1;
         }
         else{
             state="BONUS_ROUND";

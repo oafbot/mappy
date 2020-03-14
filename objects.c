@@ -311,8 +311,8 @@ Trampoline::changeColor(vector< array<array<int, TILE_SIZE>, FRAMES> > grouped, 
 }
 
 int Trampoline::tier(){
-    int row = group[0]/LEVEL_HEIGHT;
-    return game.tiers-((row-10)/game.tiers);
+    int row = (LEVEL_HEIGHT-group[0]/LEVEL_WIDTH);
+    return row/FLOOR_HEIGHT;
 }
 
 

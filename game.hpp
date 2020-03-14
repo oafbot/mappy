@@ -53,6 +53,8 @@ using namespace std;
 #define LEVEL_SIZE LEVEL_WIDTH*LEVEL_HEIGHT //2016
 #define DOOR_RANGE 6
 #define GROUND_FLOOR 480
+#define FLOORS 6
+#define FLOOR_HEIGHT ((LEVEL_HEIGHT-10)/FLOORS)
 
 #define EMPTY 0
 #define SOLID 1
@@ -669,7 +671,7 @@ class Boss: public Enemy{
 
         Collider<Boss> *collider;
         Gravity *gravity;
-        Trampoline trampoline;
+        // Trampoline trampoline;
 
         virtual void define(string name, array<array<int, SPRITE_SIZE>, FRAMES> frames);
 
@@ -686,6 +688,7 @@ class Boss: public Enemy{
         void pounce();
         void reset(double x, double y);
         int  behind();
+        // void bounce();
 };
 
 class Physics{
