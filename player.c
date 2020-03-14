@@ -38,7 +38,7 @@ void Player::reset(double x, double y){
     this->repeat = 2;
     this->cycle = 0;
     this->bounces = 0;
-    this->collider->passthru = false;
+    this->collider->passthru = true;
     this->x = x;
     this->y = y;
 }
@@ -434,6 +434,10 @@ void Player::collision(){
                 deaded();
                 break;
             }
+        }
+
+        if(collider->check(goro.collider)){
+            deaded();
         }
 }
 

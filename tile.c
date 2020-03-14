@@ -1,9 +1,11 @@
+#include "game.hpp"
 Mapper::Mapper(){
     this->x = 0;
     this->y = 0;
 }
 
 void Mapper::init(){
+    // _emscripten_push_main_loop_blocker(status, (void*)"Compiling levels...\n");
     // setStatus("Compiling levels...\n");
     this->compile();
 }
@@ -26,7 +28,7 @@ void Mapper::compile(){
 
     for(int level=0; level<data.levels.size(); level++){
         // cout << "level " << level+1 << endl;
-
+        // cout << "loaded: " << level << endl;
         texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET,
                                     LEVEL_WIDTH*BYTE*SCALE, LEVEL_HEIGHT*BYTE*SCALE);
 
@@ -61,6 +63,8 @@ void Mapper::compile(){
 
     for(int level=0; level<data.foreground.size(); level++){
         // cout << "level " << level+1 << endl;
+        // cout << "loaded: " << level << endl;
+        // emscripten_push_main_loop_blocker(status, (void*)level);
 
         texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET,
                                     LEVEL_WIDTH*BYTE*SCALE, LEVEL_HEIGHT*BYTE*SCALE);

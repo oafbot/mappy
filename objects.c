@@ -369,7 +369,7 @@ void Trampoline::clear(){
 
 Item::Item(int id){
     this->id = id;
-    this->state = "closed";
+    this->state = "default";
     this->width  = DIM;
     this->height = DIM;
     this->collected = false;
@@ -397,7 +397,7 @@ Item::Item(int id){
             break;
     }
 
-    // this->cache = game.cache.item[type];
+    this->cache = game.cache.item[type];
     this->compile();
 }
 
@@ -411,23 +411,21 @@ void Item::assign(int index){
 }
 
 void Item::compile(){
-    // /if(!contains(game.cached, type.c_str())){
-        // cout<<type.c_str()<<endl;
+    // if(!contains(game.cached, type)){
+    // cout<<type<<endl;
+    SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width*SCALE, height*SCALE);
+    SDL_SetRenderTarget(renderer, texture);
 
-        SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width*SCALE, height*SCALE);
-        SDL_SetRenderTarget(renderer, texture);
+    draw(data.items[id]);
 
-        draw(data.items[id]);
-
-        cache = texture;
-        SDL_SetRenderTarget(renderer, NULL);
-
-        // game.cached.push_back(type.c_str());
+    cache = texture;
+    SDL_SetRenderTarget(renderer, NULL);
+        // game.cached.push_back(type);
     // }
 }
 
 void Item::render(){
-    if(!collected){
+    if(!collected && game.state!="BONUS_ROUND"){
         GameObject::render();
     }
 }
@@ -437,11 +435,13 @@ void Item::collect(){
     game.sound.effects.play("item");
 
     if(game.pickup==id){
-        cout << "bonus " << points << "x" << game.factor << endl;
+        // cout << "bonus " << points << "x" << game.factor << endl;
+        game.points.item(points, game.factor, {x, y});
         game.score += points*game.factor;
         game.factor += 1;
     }
     else{
+        game.points.item(points, 1, {x, y});
         game.score += points;
     }
     game.pickup = id;
@@ -452,10 +452,14 @@ void Item::collect(){
         game.timestamp = SDL_GetTicks();
     }
 
-    cout<< "score: " << game.score << endl;
+    // cout<< "score: " << game.score << endl;
 }
 
-void Item::reset(){}
+void Item::reset(){
+    collected = false;
+    assigned  = false;
+    group.clear();
+}
 
 
 // -----------
@@ -755,8 +759,32 @@ Wave::Wave(int d, int id){
     id = id;
     channel = -1;
     direction = d;
+    animated = true;
     collider = new Collider<Wave>(this);
     collider->init(x+game.offset.x, y+game.offset.y, DIM*SCALE, DIM*SCALE-BYTE);
+    cache = &game.cache.wave;
+
+    array<array<int, SPRITE_SIZE>, 16> m = data.items;
+    array<array<int, SPRITE_SIZE>, FRAMES>
+    left_top     = {m[8],  m[9],  m[10], m[9],  m[8],  m[9],  m[10], m[9]},
+    left_bottom  = {m[11], m[12], m[13], m[12], m[11], m[12], m[13], m[12]},
+    right_top    = {flip(m[8]),  flip(m[9]),  flip(m[10]), flip(m[9]),  flip(m[8]),  flip(m[9]),  flip(m[10]), flip(m[9])},
+    right_bottom = {flip(m[11]), flip(m[12]), flip(m[13]), flip(m[12]), flip(m[11]), flip(m[12]), flip(m[13]), flip(m[12])};
+
+    Coordinates a = {0, 0}, b = {0, DIM};
+
+    vector< array<array<int, SPRITE_SIZE>, FRAMES> > g1, g2;
+
+    g1.push_back(left_top);
+    g1.push_back(left_bottom);
+    g2.push_back(right_top);
+    g2.push_back(right_bottom);
+
+    layout.push_back(a);
+    layout.push_back(b);
+
+    define("left", g1);
+    define("right", g2);
     compile();
 }
 
@@ -771,95 +799,231 @@ void Wave::assign(int index){
     init();
 }
 
+void Wave::compile(){
+    if(!contains(game.cached, type)){
+        for(map< string, vector< array< array<int, SPRITE_SIZE>, FRAMES> > >::iterator it=states.begin(); it!=states.end(); ++it){
+            string s = it->first;
+            array<SDL_Texture*, FRAMES> images;
+
+            for(int f=0; f<FRAMES; f++){
+                SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width*SCALE, height*2*SCALE);
+                SDL_SetRenderTarget(renderer, texture);
+
+                for(int i=0; i<layout.size(); i++){
+                    draw(it->second[i][f], layout[i]);
+                }
+
+                images[f] = texture;
+            }
+            this->cache->insert(make_pair(s, images));
+        }
+        game.cached.push_back("wave");
+        SDL_SetRenderTarget(renderer, NULL);
+    }
+}
+
+void Wave::define(string name, vector< array<array<int, SPRITE_SIZE>, FRAMES> > frames){
+    states.insert(make_pair(name.c_str(), frames));
+}
+
 void Wave::render(){
     if(active){
-        GameObject::render();
+        SDL_Rect dest, src;
+
+        SDL_QueryTexture((*cache)[state][frame], NULL, NULL, &width, &height);
+
+        dest.x = game.offset.x + x;
+        dest.y = game.offset.y + y;
+        dest.w = width;
+        dest.h = height;
+
+        src.x = 0;
+        src.y = 0;
+        src.w = width;
+        src.h = height;
+
+        if(animated){
+            if( frame >= FRAME_COUNT ){
+                frame = 0;
+            }
+            else{
+                frame++;
+            }
+        }
+
+        SDL_SetTextureBlendMode((*cache)[state][frame], SDL_BLENDMODE_BLEND);
+        SDL_RenderCopy(renderer, (*cache)[state][frame], &src, &dest);
     }
+}
+
+array<int, SPRITE_SIZE>
+Wave::flip(const array<int, SPRITE_SIZE> bits){
+    array<int, SPRITE_SIZE> flipped;
+    array<array<int, DIM>, SPRITE_SIZE/DIM> rows;
+    array<int, SPRITE_SIZE> flat;
+    int row;
+    int col;
+
+    for(int i=0; i < bits.size(); i++){
+        col = i % DIM;
+        row = floor(i / DIM);
+
+        if(col==0){
+            array<int, DIM> r;
+            rows[row] = r;
+        }
+        rows[row][col] = bits[i];
+    }
+
+    for(int k=0; k<rows.size(); k++){
+        reverse(rows[k].begin(), rows[k].end());
+        for(int l=0; l<rows[k].size(); l++){
+            flat[k*DIM+l] = rows[k][l];
+        }
+    }
+    return flat;
 }
 
 void Wave::update(){
     bool found;
 
     if(active){
-        if(direction==LEFT && x>0){
-            x -= SPEED;
-            for(int i=0; i<game.enemies.size(); i++){
-                found = false;
-                if(collider->check(game.enemies[i].collider)){
-                    game.enemies[i].capture(LEFT);
+        if((direction==LEFT && x>0) || (direction==RIGHT && x<game.stage.right+64)){
+            x = direction==LEFT ? x - SPEED : x + SPEED;
 
-                    for(int j=0; j<captured.size(); j++){
-                        if(captured[j]->id==game.enemies[i].id){
-                            found = true;
-                        }
-                    }
-                    if(!found){
-                        captured.push_back(&game.enemies[i]);
-                    }
+            if(collider->check(goro.collider)){
+                found = false;
+                goro.capture(direction);
+
+                for(int j=0; j<captured.size(); j++){
+                    if(captured[j]->type=="boss"){ found = true; break; }
                 }
+                if(!found) captured.push_back(&goro);
             }
-        }
-        else if(direction==RIGHT && x<game.stage.right+64){
-            x += SPEED;
+
             for(int i=0; i<game.enemies.size(); i++){
                 found = false;
                 if(collider->check(game.enemies[i].collider)){
-                    game.enemies[i].capture(RIGHT);
+                    game.enemies[i].capture(direction);
 
                     for(int j=0; j<captured.size(); j++){
-                        if(captured[j]->id==game.enemies[i].id){
-                            found = true;
-                        }
+                        if(captured[j]->id==game.enemies[i].id){ found = true; break; }
                     }
-                    if(!found){
-                        captured.push_back(&game.enemies[i]);
-                    }
+                    if(!found) captured.push_back(&game.enemies[i]);
                 }
             }
         }
         else{
-            active = false;
-            for(int i=0; i<captured.size(); i++){
-                captured[i]->release();
-            }
-            captured.clear();
-            game.sound.effects.stop(channel);
+            release();
         }
         collider->update(x+game.offset.x, y+game.offset.y+BYTE*SCALE);
     }
 }
 
-void Wave::compile(){
-    Coordinates offset;
-    SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width*SCALE, height*2*SCALE);
-    SDL_SetRenderTarget(renderer, texture);
-
-    offset = {0, 0};
-    draw(data.items[8],  offset);
-    offset = {0, DIM};
-    draw(data.items[11], offset);
-
-    cache = texture;
-    SDL_SetRenderTarget(renderer, NULL);
+void Wave::release(){
+    active = false;
+    for(int i=0; i<captured.size(); i++){
+        captured[i]->release();
+    }
+    score();
+    captured.clear();
+    game.sound.effects.stop(channel);
 }
 
-bool Wave::range(){return true;}
+// void Wave::render(){
+//     if(active){
+//         GameObject::render();
+//     }
+// }
 
 void Wave::activate(){
     active = true;
     channel = game.sound.effects.loop("wave");
+    if(direction==LEFT){
+        state = "left";
+    }
+    else{
+        state = "right";
+    }
 }
 
-void Wave::reset(){
+void Wave::score(){
+    bool boss = false;
+    int score = 0;
 
+    for(int i=0; i<captured.size(); i++){
+        if(captured[i]->type=="boss") boss = true;
+    }
+
+    switch(captured.size()){
+        case 1:
+            score = 200;
+            break;
+        case 2:
+            score = 400;
+            break;
+        case 3:
+            score = 800;
+            break;
+        case 4:
+            score = 1200;
+            break;
+        case 5:
+            score = 1600;
+            break;
+        case 6:
+            score = 2000;
+            break;
+        case 7:
+            score = 3000;
+            break;
+        case 8:
+            score = 4000;
+            break;
+        case 9:
+            score = 5000;
+            break;
+        case 10:
+            score = 6000;
+            break;
+    }
+
+    if(captured.size())
+        game.points.wave(score, boss, {x, y});
+
+    if(boss){
+        score = score * 2;
+    }
+
+    game.score += score;
+}
+
+bool Wave::range(){return true;}
+
+void Wave::reset(){
+    group.clear();
+    assigned = false;
+    active = false;
 }
 
 void Wave::cleanup(){
-    group.clear();
-    assigned = false;
+    bool boss = false;
+
+    reset();
+
+    for(int i=0; i<captured.size(); i++){
+        captured[i]->captured = false;
+        captured[i]->gravitation = true;
+    }
+
+    score();
+
+    captured.clear();
+
     if(game.sound.effects.playing(channel)){
         game.sound.effects.stop(channel);
     }
+
     channel = -1;
 }
 
@@ -941,7 +1105,7 @@ void Balloon::collect(){
     //     game.timestamp = SDL_GetTicks();
     // }
 
-    cout<< "score: " << game.score << endl;
+    // cout<< "score: " << game.score << endl;
 }
 
 void Balloon::cleanup(){
@@ -950,9 +1114,159 @@ void Balloon::cleanup(){
     active = false;
 }
 
-void Balloon::reset(){}
-
+void Balloon::reset(){
+    collected = false;
+    assigned = false;
+    active = false;
+}
 
 // -----------
 // Bell
 // -----------
+
+
+
+// -----------
+// Points
+// -----------
+
+Points::Points(){
+    type = "points";
+    cache = &game.cache.points;
+
+    define("100", data.points[0]);
+    define("200", data.points[1]);
+    define("300", data.points[2]);
+    define("400", data.points[3]);
+    define("500", data.points[4]);
+    define("x2",  data.points[5]);
+    define("x3",  data.points[6]);
+    define("x4",  data.points[7]);
+    define("x5",  data.points[8]);
+    define("x6",  data.points[9]);
+    define("00",  data.points[10]);
+    define("2",   data.points[11]);
+    define("4",   data.points[12]);
+    define("8",   data.points[13]);
+    define("12",  data.points[14]);
+    define("16",  data.points[15]);
+    define("20",  data.points[16]);
+    define("30",  data.points[17]);
+    define("40",  data.points[18]);
+    define("50",  data.points[19]);
+    define("60",  data.points[20]);
+    define("x2b", data.points[21]);
+
+    compile();
+}
+
+void Points::define(string name, array<int, SPRITE_SIZE> bits){
+    states.insert(make_pair(name.c_str(), bits));
+}
+
+void Points::compile(){
+    if(!contains(game.cached, type)){
+        for(map< string, array<int, SPRITE_SIZE> >::iterator it=states.begin(); it!=states.end(); ++it){
+            string s = it->first;
+
+            SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET,
+                                                     width*SCALE, height*SCALE);
+            SDL_SetRenderTarget(renderer, texture);
+
+            draw(it->second);
+
+            cache->insert(make_pair(s, texture));
+        }
+
+        game.cached.push_back(type);
+        SDL_SetRenderTarget(renderer, NULL);
+    }
+}
+
+void Points::render(){
+    for(int i=0; i<display.size(); i++){
+        if(display[i].type=="item"){
+            if(!game.timer.done(display[i].timestamp) && !display[i].expired){
+                Draw::render((*cache)[display[i].name], display[i].x+game.offset.x, display[i].y+game.offset.y);
+            }
+            else{
+                game.timer.reset(display[i].timestamp);
+                display[i].expired = true;
+            }
+        }
+        else{
+            if(display[i].x>game.stage.left-OFFSET*2&& display[i].x<game.stage.right+OFFSET*2){
+                display[i].x = display[i].direction==LEFT ? display[i].x - SCALE*BYTE : display[i].x + SCALE*BYTE;
+                Draw::render((*cache)[display[i].name], display[i].x+game.offset.x, display[i].y+game.offset.y);
+            }
+            else{
+                display[i].expired = true;
+            }
+        }
+    }
+
+    for(int i=0; i<display.size(); i++){
+        if(display[i].expired) display.erase(display.begin()+i);
+    }
+}
+
+void Points::item(int points, int factor, Coordinates pos){
+    display.push_back({
+        "item",
+        to_string(points),
+        pos.x,
+        pos.y-height*SCALE*0.75,
+        game.timer.start(2000),
+        false
+    });
+
+    if(factor>1)
+        display.push_back({
+            "item",
+            "x" + to_string(factor),
+            pos.x+width*SCALE,
+            pos.y-height*SCALE*0.75,
+            game.timer.start(2000),
+            false
+        });
+}
+
+void Points::wave(int points, bool dub, Coordinates pos){
+    display.push_back({
+        "wave",
+        to_string(points/100),
+        pos.x,
+        pos.y+height*SCALE,
+        NULL,
+        false,
+        pos.x > game.center.x ? LEFT : RIGHT
+    });
+
+    display.push_back({
+        "wave",
+        "00",
+        pos.x+width*SCALE,
+        pos.y+height*SCALE,
+        NULL,
+        false,
+        pos.x > game.center.x ? LEFT : RIGHT
+    });
+
+    if(dub)
+        display.push_back({
+            "wave",
+            "x2b",
+            pos.x+(width*SCALE*2),
+            pos.y+height*SCALE,
+            NULL,
+            false,
+            pos.x > game.center.x ? LEFT : RIGHT
+        });
+}
+
+void Points::reset(){
+    for(int i=0; i<display.size(); i++){
+        game.timer.reset(display[i].timestamp);
+    }
+    display.clear();
+}

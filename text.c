@@ -88,7 +88,7 @@ void Text::render(string text, int color, Coordinates offset){
     if(visible){
         for(int i=0; i<text.size(); i++){
             dest.x = offset.x + (unit + kern)*i;
-            cout << text[i];
+            // cout << text[i];
             // map<char, SDL_Texture*> chars = alpha[color];
             if(text[i]!=' '){
                 SDL_RenderCopy(renderer, alpha[color][text[i]], &src, &dest);
@@ -99,10 +99,33 @@ void Text::render(string text, int color, Coordinates offset){
         }
         // for(char& c: text){ dest.x += BYTE*SCALE + kern; SDL_RenderCopy(renderer, alpha[color][c], &src, &dest); }
     }
-    cout << endl;
+    // cout << endl;
 }
 
 void Text::render(string text, int color, int col, int row){
     Coordinates c = { (double)col*unit, (double)row*unit };
     render(text, color, c);
 }
+
+int Text::getWidth(string text){
+    int size = text.size();
+    return size*unit + ((size-1)*kern);
+}
+
+void Text::score(int sc, int digits){
+    string s = to_string(sc);
+    int offset = digits - s.size();
+    for(int i=0; i<offset; i++){
+        s = " " + s;
+    }
+    render(s, WHITE, 1, 1);
+}
+
+void Text::score(int sc){
+    int digits = 10;
+    score(sc, digits);
+}
+
+// void Text::animate(){
+
+// }

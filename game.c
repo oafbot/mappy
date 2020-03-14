@@ -33,7 +33,7 @@ Game::Game() : stage(0,0){
     this->timer     = * new Timer();
     this->text      = * new Text();
     this->controls.lock = false;
-    this->state = "START_SCREEN";
+    this->state = "LOADING";
 }
 
 void Game::update(){
@@ -55,6 +55,8 @@ void Game::update(){
                     enemies[i].update();
                 }
             }
+
+            goro.update();
 
             for(int i=0; i<doors.size(); i++){
                 if(doors[i].type=="magic" && doors[i].wave.active){
@@ -114,6 +116,10 @@ void Game::renderObjects(){
             // doors[i].wave.collider->debug();
         }
     }
+
+    // goro.collider->debug();
+    goro.render();
+
     for(int i=0; i<items.size(); i++){
         items[i].render();
     }
@@ -137,6 +143,10 @@ void Game::render(){
     // player.collider->debug();
     player.render();
     mapper.render("foreground");
+    points.render();
+
+    if(state!="BONUS_ROUND")
+        game.text.score(game.score);
 
     last_time = current_time;
 }
@@ -154,7 +164,28 @@ void Game::loop(){
             last_time = current_time;
         }
     }
+    else if(state=="LOADING"){
+        if(timer.done(timeout)){
+            state = "START_SCREEN";
+        }
+    }
+    else if(state=="START_SCREEN"){
+        demo.animate();
+    }
+
+    if(state=="START_DELAY"){
+        if(timer.done(timeout)){
+            state = isBonusRound(level) ? "BONUS_ROUND" : "RUNNING";
+            timer.reset(timeout);
+
+            this->mode  = PLAY;
+            this->music = ON;
+            PAUSED = false;
+        }
+
+    }
 }
+
 
 void Game::setup(){
     int key;
@@ -209,16 +240,19 @@ void Game::setup(){
                 case COMPUTER:
                 case PAINTING:
                 case SAFE:
-                    skip.push_back(i);
-                    skip.push_back(i+1);
-                    skip.push_back(i+LEVEL_WIDTH);
-                    skip.push_back(i+LEVEL_WIDTH+1);
+                    for(int m=0; m<items.size(); m++){
+                        if(items[m].id==key-7 && !items[m].assigned){
+                            skip.push_back(i);
+                            skip.push_back(i+1);
+                            skip.push_back(i+LEVEL_WIDTH);
+                            skip.push_back(i+LEVEL_WIDTH+1);
 
-                    Item item = Item(key-7);
-                    item.assign(i);
-                    items.push_back(item);
+                            // Item item = Item(key-7);
+                            items[m].assign(i);
+                            break;
+                        }
+                    }
                     break;
-
             }
         }
     }
@@ -232,24 +266,31 @@ void Game::start(){
     sound.music.load("bonus", AUDIO_BONUS);
     sound.music.load("fanfare", AUDIO_FANFARE);
     sound.music.load("results", AUDIO_RESULTS);
-    sound.effects.load("dead", AUDIO_DEAD);
+    sound.effects.load("dead",  AUDIO_DEAD);
     sound.effects.load("clear", AUDIO_CLEAR);
-    sound.effects.load("item", AUDIO_ITEM);
-    sound.effects.load("wave", AUDIO_WAVE);
+    sound.effects.load("item",  AUDIO_ITEM);
+    sound.effects.load("wave",  AUDIO_WAVE);
+    sound.effects.load("start", AUDIO_START);
     sound.effects.load("trampoline", AUDIO_JUMP);
 
-    this->PAUSED = false;
+    sound.effects.play("start");
+    state = "START_DELAY";
+    timer.reset(timeout);
+    timeout = timer.start(1000);
 
-    if(level!=3){
-        state="RUNNING";
+    this->PAUSED = true;
+
+    if(!isBonusRound(level)){
+        player.reset(580, 480);
+        goro.reset(770, 160);
     }
     else{
-        state="BONUS_ROUND";
         player.reset(620, 160);
+        // goro.reset(770, 160);
     }
 
     this->mode  = PLAY;
-    this->music = ON;
+    this->music = OFF;
     this->playBGM();
 }
 
@@ -257,9 +298,8 @@ void Game::init(int w, int h){
     SDL_CreateWindowAndRenderer(w, h, 0, &window, &renderer);
     SDL_SetRenderDrawColor( renderer, 0, 0, 0, 255 );
     SDL_RenderClear( renderer );
-    //         w r  g  b  y  o  p
-    text.init({2,30,42,13,36,37,21}, w, h);
-    text.render("hello world", 2, {0, 0});
+
+    text.init({WHITE,RED,GREEN,BLUE,YELLOW,ORANGE,PINK}, w, h);
 
     this->PAUSED = true;
 
@@ -267,6 +307,11 @@ void Game::init(int w, int h){
     this->center.x = this->stage.width/2;
     this->center.y = this->stage.height/2;
     this->stage.bottom -= DIM*SCALE;
+
+    demo = * new Demo();
+    demo.start();
+
+    points = * new Points();
 
     physics = * new Physics();
     player.gravity = physics.gravity(0.125, 0);
@@ -283,6 +328,12 @@ void Game::init(int w, int h){
         for(int j=0; j<6; j++){
             Door door = * new Door(i, i*4+j);
             doors.push_back(door);
+        }
+    }
+
+    for(int i=0; i<5; i++){
+        for(int j=0; j<2; j++){
+            items.push_back(* new Item(i));
         }
     }
 
@@ -303,9 +354,12 @@ void Game::init(int w, int h){
         enemies.push_back(mewkie);
     }
 
-    // for(int i=0; i<data.enemies[level-1]; i++){
-    //     enemies[i].reset(data.spawn[i][0], data.spawn[i][1]);
-    // }
+    goro = * new Boss();
+    goro.init(0,0);
+    goro.gravity = physics.gravity(0.125, 0);
+    goro.active = true;
+
+    timeout = timer.start(1500);
 
     // for(int i=0; i<cached.size(); i++){ cout << cached[i] << " "; }
     // cout<<endl;
@@ -454,6 +508,10 @@ void Game::restage(){
         }
         else{
             state="BONUS_ROUND";
+
+            for(int i=0; i<balloons.size(); i++){
+                balloons[i].reset();
+            }
         }
 
         for(int t=0; t<trampolines.size(); t++){
@@ -466,6 +524,10 @@ void Game::restage(){
             doors[d].cleanup();
         }
 
+        for(int i=0; i<items.size(); i++){
+            items[i].reset();
+        }
+
         for(int i=0; i<enemies.size(); i++){
             enemies[i].deactivate();
         }
@@ -476,11 +538,14 @@ void Game::restage(){
 
         setup();
 
+        points.reset();
+
         if(state=="BONUS_ROUND"){
             player.reset(620, 160);
         }
         else{
             player.reset(580, 480);
+            goro.reset(770, 160);
         }
 
         controls.lock = false;
@@ -503,15 +568,13 @@ void Game::restage(){
 void Game::restart(){
     clear();
     sound.effects.stop();
+    player.reset(580, 480);
 
     for(int d=0; d<doors.size(); d++){
         if(doors[d].id+3==MAGIC_DOOR_R || doors[d].id+3==MAGIC_DOOR_L){
             doors[d].wave.cleanup();
         }
     }
-
-    player.reset(580, 480);
-    controls.lock = false;
 
     for(int i=0; i<enemies.size(); i++){
         enemies[i].deactivate();
@@ -524,6 +587,12 @@ void Game::restart(){
     for(int t=0; t<trampolines.size(); t++){
         trampolines[t].reset();
     }
+
+    points.reset();
+
+    goro.reset(770, 160);
+
+    controls.lock = false;
 
     this->PAUSED    = false;
     this->RESET     = false;
@@ -538,6 +607,14 @@ void Game::restart(){
 }
 
 void Game::reset(){
+    stopBGM();
     level = 0;
+    clear();
+    collected.clear();
+    state = "CLEAR_SCREEN";
     restage();
+    PAUSED = true;
+    mode = DISPLAY;
+    demo.start();
+    state = "START_SCREEN";
 }

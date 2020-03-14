@@ -1,10 +1,14 @@
 #include "game.hpp"
 #include "audio.c"
 #include "data.c"
+#include "draw.c"
+#include "title.c"
 #include "text.c"
+#include "demo.c"
 #include "sprite.c"
 #include "player.c"
 #include "enemy.c"
+#include "boss.c"
 #include "physics.c"
 #include "control.c"
 #include "objects.c"
@@ -30,6 +34,7 @@ SDL_Event     event;
 Game    game;
 Player  player;
 Physics physics;
+Boss    goro;
 
 void init(){
     array <array<int, SPRITE_SIZE>, BITMAP_SIZE> b = data.sprites;
@@ -60,7 +65,7 @@ void gameloop(){
 
 int main(){
     player = * new Player();
-    player.init(580, 480);
+    // player.init(580, 480);
 
     game = * new Game();
     game.init(800, 600);
@@ -68,7 +73,6 @@ int main(){
     init();
 
     // last_frame_time = last_time = SDL_GetTicks();
-
     emscripten_set_main_loop(gameloop, 0, 0);
     return 1;
 }

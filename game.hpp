@@ -29,6 +29,7 @@ using namespace std;
 #define DIM 16
 #define SPEED 1.5
 #define ENEMY_SPEED 1
+#define BOSS_SPEED 1.25
 #define BYTE 8
 #define WORD 16
 #define LONG 32
@@ -68,8 +69,17 @@ using namespace std;
 #define BELL 12
 #define BALLOON 13
 
+#define WHITE 2
+#define RED 30
+#define GREEN 42
+#define BLUE 13
+#define YELLOW 36
+#define ORANGE 37
+#define PINK 21
+
 #define AUDIO_THEME (char*)"/audio/theme.wav"
 #define AUDIO_BONUS (char*)"/audio/bonus.wav"
+#define AUDIO_START (char*)"/audio/start.wav"
 #define AUDIO_FANFARE (char*)"/audio/fanfare.wav"
 #define AUDIO_RESULTS (char*)"/audio/results.wav"
 #define AUDIO_DEAD (char*)"/audio/dead.wav"
@@ -98,8 +108,10 @@ class Enemy;
 class Physics;
 class Mapper;
 class Game;
+class Draw;
+class Title;
+class Demo;
 
-// class GameObjects{};
 // class FieldInterface{
 //     int m_Size;
 //     ~FieldInterface() = default;
@@ -121,8 +133,8 @@ struct Data{
     array <array<int, LEVEL_WIDTH*8>, 16> foreground;
     array <array<int, SPRITE_SIZE>, 16> items;
     array <array<int, TILE_SIZE>, 42> alpha;
-    array <array<int, SPRITE_SIZE>, 32> scores;
-    array <array<int, 4096>, 3> title;
+    array <array<int, SPRITE_SIZE>, 32> points;
+    array <array<int, 1024>, 11> title;
     array <int, 16> enemies;
     array <array<int, 2>, 10> spawn;
 };
@@ -130,6 +142,16 @@ struct Data{
 struct Coordinates{
     double x;
     double y;
+};
+
+struct Info{
+    string type;
+    string name;
+    double x;
+    double y;
+    int    timestamp;
+    bool   expired;
+    int    direction;
 };
 
 class Stage{
@@ -208,6 +230,9 @@ class Text{
         void render(string text, int color, Coordinates offset);
         void render(string text, int color, int col, int row);
         void center(string text, int color, int row);
+        int  getWidth(string text);
+        void score(int score, int digits);
+        void score(int score);
         // void color(int color);
 };
 
@@ -378,7 +403,6 @@ class Trampoline: public GameObject{
 
         vector< array<array<int, TILE_SIZE>, FRAMES> >
         changeColor(vector< array<array<int, TILE_SIZE>, FRAMES> > grouped, int color);
-
 };
 
 class Item: public GameObject{
@@ -407,15 +431,14 @@ class Wave: public GameObject{
 
         Collider<Wave> *collider;
         vector<Enemy*> captured;
-
-        // struct Offset{
-        //     double x;
-        //     double y;
-        // } offset;
+        map<string, array<SDL_Texture*, FRAMES> >* cache;
+        vector< Coordinates > layout;
+        map< string, vector< array<array<int, SPRITE_SIZE>, FRAMES> > >states;
 
         Wave(int direction, int id);
         void init();
         void assign(int index);
+        void define(string name, vector< array<array<int, SPRITE_SIZE>, FRAMES> > frames);
         void reset();
         void render();
         void compile();
@@ -423,6 +446,11 @@ class Wave: public GameObject{
         bool range();
         void cleanup();
         void update();
+        void release();
+        void score();
+
+        array<int, SPRITE_SIZE>
+        flip(const array<int, SPRITE_SIZE> bits);
 };
 
 class Door: public GameObject{
@@ -490,6 +518,21 @@ class Bell: public GameObject{
         void render();
         void compile();
         void cleanup();
+};
+
+class Points: public GameObject{
+    public:
+        map<string, array<int, SPRITE_SIZE> > states;
+        map<string, SDL_Texture*>* cache;
+        vector<Info> display;
+
+        Points();
+        void define(string name, array<int, SPRITE_SIZE> bits);
+        void compile();
+        void render();
+        void item(int points, int factor, Coordinates pos);
+        void wave(int points, bool dub, Coordinates pos);
+        void reset();
 };
 
 class Player: public Sprite{
@@ -572,7 +615,6 @@ class Enemy: public Sprite{
         map< string, array<array<int, SPRITE_SIZE>, FRAMES> > states;
         map<string, array<SDL_Texture*, FRAMES> >* cache;
 
-
         Collider<Enemy> *collider;
         Gravity *gravity;
         Trampoline trampoline;
@@ -603,7 +645,6 @@ class Enemy: public Sprite{
         void draw(const array<int, SPRITE_SIZE> &bits);
         void compile();
         void koed();
-        // bool collision(Collider<Player> complement);
         void wander();
         void pursue();
         void decision();
@@ -620,6 +661,32 @@ class Enemy: public Sprite{
         void deactivate();
 };
 
+class Boss: public Enemy{
+    public:
+        int hiding;
+        map< string, array<array<int, SPRITE_SIZE>, FRAMES> > states;
+        map<string, array<SDL_Texture*, FRAMES> >* cache;
+
+        Collider<Boss> *collider;
+        Gravity *gravity;
+        Trampoline trampoline;
+
+        virtual void define(string name, array<array<int, SPRITE_SIZE>, FRAMES> frames);
+
+        Boss();
+        void compile();
+        void render();
+        void draw(const array<int, SPRITE_SIZE> &bits);
+        void update();
+        // void wander();
+        void walk();
+        void decision();
+        void move();
+        void hide(int index);
+        void pounce();
+        void reset(double x, double y);
+        int  behind();
+};
 
 class Physics{
     public:
@@ -632,6 +699,47 @@ class Physics{
         Gravity* gravity(float factor,  int delay);
         void bounce();
         void update();
+};
+
+class Title{
+    public:
+        int width;
+        int height;
+        SDL_Texture* cache;
+        Coordinates position;
+
+        void display();
+        void compile();
+        void render(double x, double y);
+};
+
+class Draw{
+    public:
+        static void clear();
+        static void render(SDL_Texture* cache, double x, double y);
+
+        template <class T>
+        static void plot(const T &bits, int units, Coordinates offset);
+
+        template <class T>
+        static SDL_Texture* compile(T data, int cols, int units);
+};
+
+class Demo{
+    public:
+        Title title;
+        vector<Coordinates> position;
+        int scene;
+        array<string, 16> lines;
+
+        Demo();
+        void cast();
+        void start();
+        void reset();
+        void animate();
+        void credits(double goal);
+        void scrollLeft(string text, int pos, int inc, int color);
+        void hide(double x, double y, int width, int height);
 };
 
 class Mapper{
@@ -691,6 +799,8 @@ class Game{
         Sound   sound;
         Timer   timer;
         Text    text;
+        Demo    demo;
+        Points  points;
 
         vector<int>   skip;
         vector<int>   collected;
@@ -703,12 +813,16 @@ class Game{
 
         struct Cache{
             map<string, array<SDL_Texture*, FRAMES> > enemy;
+            map<string, array<SDL_Texture*, FRAMES> > boss;
             map<string, array<SDL_Texture*, FRAMES> > trampoline;
+            map<string, array<SDL_Texture*, FRAMES> > wave;
             map<string, map<string, vector<SDL_Texture*> > > door;
             map<string, SDL_Texture*> item;
+            map<string, SDL_Texture*> points;
             vector<SDL_Texture*> tiles;
             array<SDL_Texture*, 4> balloon;
             array<SDL_Texture*, 16> background;
+            array<SDL_Texture*, 11> title;
         } cache;
 
         Game();
@@ -759,11 +873,15 @@ bool contains(vector<T> haystack, T needle){
     return find(begin(haystack), end(haystack), needle)!=end(haystack);
 }
 
+// em_arg_callback_func status(em_arg_callback_func status){
+//     cout << status << endl;
+//     return status;
+// }
 
 extern Game    game;
 extern Physics physics;
 extern Player  player;
-extern Enemy   enemy;
+extern Boss    goro;
 extern struct  Data data;
 
 extern Uint32 last_time;

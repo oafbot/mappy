@@ -9,6 +9,7 @@ void Physics::update(){
     for(int i=0; i < game.enemies.size(); i++){
         game.enemies[i].gravity->update(&game.enemies[i]);
     }
+    goro.gravity->update(&goro);
 }
 
 Gravity* Physics::gravity(float factor,  int delay){
@@ -112,7 +113,7 @@ void Gravity::update(T* sprite){
                     else if(sprite->type=="player" && sprite->y>GROUND_FLOOR){
                         sprite->deaded();
                     }
-                    else if(sprite->type=="enemy" && sprite->y>GROUND_FLOOR){
+                    else if((sprite->type=="enemy" || sprite->type=="boss") && sprite->y>GROUND_FLOOR){
                         bound(sprite, game.trampolines[t]);
                     }
                 }

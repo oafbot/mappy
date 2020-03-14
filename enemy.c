@@ -31,8 +31,8 @@ Enemy::Enemy() : Sprite(){
     this->frame       = 0;
     this->bounces     = -1;
     this->captured    = false;
-    this->collider = new Collider<Enemy>(this);
-    this->cache = &game.cache.enemy;
+    this->collider    = new Collider<Enemy>(this);
+    this->cache       = &game.cache.enemy;
 
     this->compile();
 };
@@ -125,10 +125,10 @@ void Enemy::update(){
                 this->collider->passthru = true;
             }
             else if(this->falling || this->bouncing){
-                    // this->state = this->direction=="left" ? "hop-left" : "hop-right";
+                // this->state = this->direction=="left" ? "hop-left" : "hop-right";
                 this->collider->passthru = true;
             }
-            else if(state=="hop-left" && state=="hop-right"){
+            else if(state=="hop-left" || state=="hop-right"){
                 this->collider->passthru = true;
             }
             else if(state!="hop-left" && state!="hop-right"){
@@ -151,10 +151,10 @@ void Enemy::update(){
         }
         else{
             if(state=="ko-left" && x>slide){
-                x -= ENEMY_SPEED;
+                x -= ENEMY_SPEED*2;
             }
             else if(state=="ko-right" && x<slide){
-                x += ENEMY_SPEED;
+                x += ENEMY_SPEED*2;
             }
 
             this->collider->passthru = true;
@@ -217,7 +217,7 @@ void Enemy::compile(){
             cache->insert(make_pair(s, images));
         }
         SDL_SetRenderTarget(renderer, NULL);
-        game.cached.push_back("enemy");
+        game.cached.push_back(type);
     }
 }
 
@@ -357,21 +357,6 @@ void Enemy::align(){
 }
 
 void Enemy::align(bool horiz){
-    // int i = index(x, y);
-    // int col = i % LEVEL_WIDTH;
-
-    // if(col%17<2 && col%17!=0){
-    //     x = ( col + (col%17)-1  )*BYTE*SCALE  + width;
-    // }
-    // else if(col%17<4){
-    //     // cout << col%17 << endl;
-    //     x = ( col + 1 - (col%17) )*BYTE*SCALE + width;
-    // }
-
-    // if(x>game.center.x-DIM*SCALE*3 && x<game.center.x+DIM*SCALE*3){
-    //     // cout << x << endl;
-    //     x += game.offset.x;
-    // }
     x = (trampoline.group[1]%LEVEL_WIDTH)*BYTE*SCALE + (BYTE*SCALE/2) - (width*SCALE/2);
 }
 
@@ -524,7 +509,7 @@ void Enemy::wander(){
         }
     }
     else{
-        r = rand() % 3;
+        r = rand() % 5;
         switch(r){
             case 0:
                 direction = "left";
@@ -648,6 +633,7 @@ void Enemy::reset(double x, double y){
     this->active      = true;
     this->bounces     = -1;
     this->collider->passthru = false;
+    this->collider->update(x+game.offset.x, y+game.offset.y);
 }
 
 void Enemy::deactivate(){
