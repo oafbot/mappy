@@ -149,7 +149,7 @@ void Gravity::update(T* sprite){
                 }
             }
 
-            if(tile!=BALLOON && tile!=EMPTY && !broken){
+            if(tile!=BALLOON && tile!=BELL && tile!=EMPTY && !broken){
                 lift = 0;
                 if(sprite->type=="player")
                     sprite->state = "turn";
@@ -191,7 +191,7 @@ Collider<T>::Collider(T* obj){
 
 template <class T>
 void Collider<T>::init(double x, double y, int w, int h){
-    this->offset = w/8;
+    this->offset = (w*SCALE)/8;
     this->x = x + offset;
     this->y = y;
     this->width  = w*SCALE-(offset*4);
@@ -222,7 +222,7 @@ void Collider<T>::debug(){
 template <class T>
 template <class T2>
 bool Collider<T>::check(Collider<T2>* collider){
-    if(this->passthru || (collider->passthru && object->type!="wave")){
+    if(this->passthru || (collider->passthru && object->type!="wave" && object->type!="bell")){
         return false;
     }
 

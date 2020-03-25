@@ -60,6 +60,15 @@ SDL_Texture* Draw::compile(T data, int cols, int units){
     return texture;
 }
 
+template <class T>
+SDL_Texture* Draw::compile(T data, int units){
+    int col, row;
+    SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, units*SCALE, units*SCALE);
+    SDL_SetRenderTarget(renderer, texture);
+    plot(data, units, {0, 0});
+    return texture;
+}
+
 void Draw::clear(){
      SDL_SetRenderTarget(renderer, NULL);
 }

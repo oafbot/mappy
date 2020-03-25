@@ -180,6 +180,28 @@ void Trampoline::define(string name, vector< array<array<int, TILE_SIZE>, FRAMES
     this->states.insert(make_pair(name.c_str(), frames));
 }
 
+void Trampoline::update(){
+    if(assigned){
+        switch(bounces){
+            case 0:
+                state = "green";
+                break;
+            case 1:
+                state = "yellow";
+                break;
+            case 2:
+                state = "orange";
+                break;
+            case 3:
+                state = "red";
+                break;
+            case 4:
+                state = "broken";
+                break;
+        }
+    }
+}
+
 void Trampoline::render(){
     SDL_Rect dest, src;
     dest.x = game.offset.x + x;
@@ -194,7 +216,6 @@ void Trampoline::render(){
 
     if(animated){
         if( frame >= FRAME_COUNT ){
-            bounce();
             if(loop==true || cycle<repeat){
                 frame = 0;
                 cycle++;
@@ -204,6 +225,9 @@ void Trampoline::render(){
             }
         }
         else{
+            if(frame==5){
+                bounce();
+            }
             frame++;
         }
     }
@@ -331,24 +355,6 @@ void Trampoline::bounce(){
     if(jumper=="player" && bounces<=BOUNCES){
         bounces++;
     }
-    switch(bounces){
-        case 0:
-            state = "green";
-            break;
-        case 1:
-            state = "yellow";
-            break;
-        case 2:
-            state = "orange";
-            break;
-        case 3:
-            state = "red";
-            break;
-        case 4:
-            state = "broken";
-            break;
-    }
-
     active = false;
 }
 
@@ -431,17 +437,24 @@ void Item::render(){
 }
 
 void Item::collect(){
+    bool bonus = false;
     collected = true;
     game.sound.effects.play("item");
 
+    if(contains(group, goro.index(goro.x, goro.y))){
+        game.score += 1000;
+        goro.reward();
+        bonus = true;
+    }
+
     if(game.pickup==id){
         // cout << "bonus " << points << "x" << game.factor << endl;
-        game.points.item(points, game.factor, {x, y});
+        if(!bonus) game.points.item(points, game.factor, {x, y});
         game.score += points*game.factor;
         game.factor += 1;
     }
     else{
-        game.points.item(points, 1, {x, y});
+        if(!bonus) game.points.item(points, 1, {x, y});
         game.score += points;
     }
     game.pickup = id;
@@ -550,6 +563,13 @@ void Door::assign(int index){
     this->assigned = true;
     this->init();
 
+    if(direction==RIGHT && data.interactive[game.level-1][index + LEVEL_WIDTH - 1]==0){
+        offset.x -= 2*BYTE;
+    }
+    else if(direction == LEFT && data.interactive[game.level-1][index + LEVEL_WIDTH + 1]==0){
+        offset.x -= 2*BYTE;
+    }
+
     if(id+3==MAGIC_DOOR_L || id+3==MAGIC_DOOR_R){
         wave.assign(index);
     }
@@ -563,6 +583,7 @@ void Door::cleanup(){
     this->frame    = 0;
     this->x        = 0;
     this->y        = 0;
+    this->offset.x = direction==LEFT ? -BYTE*SCALE : BYTE*SCALE;
     this->group.clear();
 
     if(id+3==MAGIC_DOOR_R || id+3==MAGIC_DOOR_L){
@@ -697,7 +718,7 @@ bool Door::range(){
     return (pos < group[0] && pos > group[0]-DOOR_RANGE) || (pos > group[0] && pos < group[0]+DOOR_RANGE);
 }
 
-void Door::operate(int index){
+void Door::operate(){
     if(assigned){
         if(state=="closed"){
             state = "opening";
@@ -736,10 +757,10 @@ void Door::knockout(){
         int door = group[0],
             enemy = game.enemies[i].index();
 
-        if(direction==LEFT && enemy>door-DOOR_RANGE && enemy<door-1){
+        if(direction==LEFT && enemy>door-DOOR_RANGE && enemy<door){
             game.enemies[i].knockedout(RIGHT, x);
         }
-        else if(direction==RIGHT && enemy<door+DOOR_RANGE && enemy>door+1){
+        else if(direction==RIGHT && enemy<door+DOOR_RANGE && enemy>door){
             game.enemies[i].knockedout(LEFT, x);
         }
     }
@@ -764,7 +785,7 @@ Wave::Wave(int d, int id){
     collider->init(x+game.offset.x, y+game.offset.y, DIM*SCALE, DIM*SCALE-BYTE);
     cache = &game.cache.wave;
 
-    array<array<int, SPRITE_SIZE>, 16> m = data.items;
+    array<array<int, SPRITE_SIZE>, ITEMS_SIZE> m = data.items;
     array<array<int, SPRITE_SIZE>, FRAMES>
     left_top     = {m[8],  m[9],  m[10], m[9],  m[8],  m[9],  m[10], m[9]},
     left_bottom  = {m[11], m[12], m[13], m[12], m[11], m[12], m[13], m[12]},
@@ -923,7 +944,7 @@ void Wave::update(){
 void Wave::release(){
     active = false;
     for(int i=0; i<captured.size(); i++){
-        captured[i]->release();
+        captured[i]->release(i+1);
     }
     score();
     captured.clear();
@@ -1032,15 +1053,40 @@ void Wave::cleanup(){
 // Balloon
 // -----------
 
-Balloon::Balloon(){
-    type     = "balloon";
+Balloon::Balloon(bool bonus){
     assigned  = false;
     collected = false;
     animated  = true;
-    points    = 200;
-    cache = &game.cache.balloon;
-    frames = {data.items[6], data.items[6], data.items[7], data.items[7]};
+    type      = bonus ? "bonus" : "balloon";
+    points    = bonus ? 2000 : 200;
+    cache     = bonus ? &game.cache.big_balloon : &game.cache.balloon;
+
+    if(bonus){
+        bonus_frames[0] = {data.items[18], data.items[19], data.items[20], data.items[21]};
+        bonus_frames[1] = {data.items[18], data.items[19], data.items[20], data.items[21]};
+        bonus_frames[2] = {data.items[18], data.items[19], data.items[20], data.items[21]};
+        bonus_frames[3] = {data.items[22], data.items[23], data.items[24], data.items[25]};
+
+/*        bonus_frames[0] = {data.items[18], data.items[19], data.items[20], data.items[21]};
+        bonus_frames[1] = {data.items[18], data.items[19], data.items[20], data.items[21]};
+        bonus_frames[2] = {data.items[18], data.items[19], data.items[20], data.items[21]};
+        bonus_frames[3] = {data.items[18], data.items[19], data.items[20], data.items[21]};
+        bonus_frames[4] = {data.items[22], data.items[23], data.items[24], data.items[25]};
+        bonus_frames[5] = {data.items[22], data.items[23], data.items[24], data.items[25]};
+        bonus_frames[6] = {data.items[22], data.items[23], data.items[24], data.items[25]};
+        bonus_frames[7] = {data.items[22], data.items[23], data.items[24], data.items[25]};*/
+
+        width  = width*2;
+        height = height*2;
+    }
+    else{
+        frames = {data.items[6], data.items[6], data.items[7], data.items[7]};
+    }
     compile();
+}
+
+Balloon::Balloon(){
+    Balloon(false);
 }
 
 void Balloon::assign(int index){
@@ -1048,6 +1094,20 @@ void Balloon::assign(int index){
     group.push_back(index+1);
     group.push_back(index+LEVEL_WIDTH);
     group.push_back(index+LEVEL_WIDTH+1);
+
+    if(type=="bonus"){
+        group.push_back(index+2);
+        group.push_back(index+3);
+        group.push_back(index+LEVEL_WIDTH+2);
+        group.push_back(index+LEVEL_WIDTH+3);
+        group.push_back(index+LEVEL_WIDTH*2);
+        group.push_back(index+LEVEL_WIDTH*2+2);
+        group.push_back(index+LEVEL_WIDTH*2+3);
+        group.push_back(index+LEVEL_WIDTH*3);
+        group.push_back(index+LEVEL_WIDTH*3+2);
+        group.push_back(index+LEVEL_WIDTH*3+3);
+    }
+
     assigned = true;
     active = true;
     init();
@@ -1059,8 +1119,27 @@ void Balloon::compile(){
             SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width*SCALE, height*SCALE);
             SDL_SetRenderTarget(renderer, texture);
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-
-            draw(frames[f]);
+            if(type=="bonus"){
+                for(int i=0; i<4; i++){
+                    switch(i){
+                        case 0:
+                            draw(bonus_frames[f][i]);
+                            break;
+                        case 1:
+                            draw(bonus_frames[f][i], {DIM, 0});
+                            break;
+                        case 2:
+                            draw(bonus_frames[f][i], {0, DIM});
+                            break;
+                        case 3:
+                            draw(bonus_frames[f][i], {DIM, DIM});
+                            break;
+                    }
+                }
+            }
+            else{
+                draw(frames[f]);
+            }
 
             (*cache)[f] = texture;
         }
@@ -1095,15 +1174,13 @@ void Balloon::render(){
 void Balloon::collect(){
     collected = true;
     active    = false;
-    game.sound.effects.play("item");
+
+    if(!game.sound.effects.playing(5))
+        game.sound.effects.play("item", 5);
 
     game.score += points;
 
-    // game.collected.push_back(id);
-
-    // if(game.collected.size()==10){
-    //     game.timestamp = SDL_GetTicks();
-    // }
+    game.collected.push_back(points);
 
     // cout<< "score: " << game.score << endl;
 }
@@ -1124,7 +1201,141 @@ void Balloon::reset(){
 // Bell
 // -----------
 
+Bell::Bell(){
+    this->type = "bell";
+    this->state  = "default";
+    this->width  = DIM;
+    this->height = DIM;
+    this->dropped = false;
+    this->tallied = false;
+    this->cache = game.cache.item[type];
+    this->compile();
+    this->collider = new Collider<Bell>(this);
+    this->collider->init(x+game.offset.x+(x>game.center.x ? -20 : 0), y+game.offset.y, 32, height);
+}
 
+void Bell::assign(int index){
+    group.push_back(index);
+    group.push_back(index+1);
+    group.push_back(index+LEVEL_WIDTH);
+    group.push_back(index+LEVEL_WIDTH+1);
+    assigned = true;
+    init();
+    collider->update(x+game.offset.x+(x>game.center.x ? -20 : 0), y+game.offset.y);
+}
+
+void Bell::compile(){
+    // if(!contains(game.cached, type)){
+    // cout<<type<<endl;
+    SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width*SCALE, height*SCALE);
+    SDL_SetRenderTarget(renderer, texture);
+
+    draw(data.items[5]);
+
+    cache = texture;
+    SDL_SetRenderTarget(renderer, NULL);
+    // game.cached.push_back(type);
+    // }
+}
+
+void Bell::render(){
+    // if(!collected && game.state!="BONUS_ROUND" && assigned){
+    //     GameObject::render();
+    // }
+    if(assigned){
+        SDL_Rect dest, src;
+        int width, height;
+
+        SDL_QueryTexture(cache, NULL, NULL, &width, &height);
+
+        dest.x = game.offset.x + (x>game.center.x ? -7 : 7) + x;
+        dest.y = game.offset.y + y;
+        dest.w = width;
+        dest.h = height;
+
+        src.x = 0;
+        src.y = 0;
+        src.w = width;
+        src.h = height;
+        SDL_SetTextureBlendMode(cache, SDL_BLENDMODE_BLEND);
+        SDL_RenderCopy(renderer, cache, &src, &dest);
+    }
+}
+
+void Bell::reset(){
+    dropped  = false;
+    active   = false;
+    assigned = false;
+    tallied  = false;
+    group.clear();
+    squashed.clear();
+}
+
+void Bell::cleanup(){}
+
+void Bell::drop(){
+    dropped = true;
+    active = true;
+    game.sound.effects.play("bell");
+}
+
+void Bell::update(){
+    if(active){
+        bool found;
+        y += SPEED*SCALE;
+        collider->update(x+game.offset.x+(x>game.center.x ? -20 : 0), y+game.offset.y);
+
+        for(int i=0; i<game.enemies.size(); i++){
+            if(collider->check(game.enemies[i].collider)){
+                found = false;
+                for(int j=0; j<squashed.size(); j++){
+                    if(squashed[j]->id==game.enemies[i].id){ found = true; break; }
+                }
+                if(!found) squashed.push_back(&game.enemies[i]);
+
+                game.enemies[i].bouncing = false;
+                game.enemies[i].gravitation = false;
+                game.enemies[i].animated = false;
+                game.enemies[i].collider->passthru = true;
+            }
+        }
+
+        if(collider->check(goro.collider)){
+            found = false;
+            for(int j=0; j<squashed.size(); j++){
+                if(squashed[j]->type=="boss"){ found = true; break; }
+            }
+            if(!found) squashed.push_back(&goro);
+
+            goro.bouncing = false;
+            goro.gravitation = false;
+            goro.animated = false;
+            goro.collider->passthru = true;
+        }
+
+        for(int i=0; i<squashed.size(); i++){
+            squashed[i]->y = y+DIM*SCALE;
+            squashed[i]->x = x;
+        }
+
+        if(y>game.stage.bottom+height*SCALE){
+            active = false;
+            for(int i=0; i<squashed.size(); i++){
+                squashed[i]->respawn();
+            }
+            if(!tallied) tally();
+        }
+    }
+}
+
+void Bell::tally(){
+    tallied = true;
+    for(int i=0; i<squashed.size(); i++){
+        squashed[i]->respawn();
+        game.score += squashed[i]->type=="boss" ? 1000 : 300;
+    }
+    squashed.clear();
+}
 
 // -----------
 // Points
@@ -1232,36 +1443,38 @@ void Points::item(int points, int factor, Coordinates pos){
 }
 
 void Points::wave(int points, bool dub, Coordinates pos){
-    display.push_back({
-        "wave",
-        to_string(points/100),
-        pos.x,
-        pos.y+height*SCALE,
-        NULL,
-        false,
-        pos.x > game.center.x ? LEFT : RIGHT
-    });
-
-    display.push_back({
-        "wave",
-        "00",
-        pos.x+width*SCALE,
-        pos.y+height*SCALE,
-        NULL,
-        false,
-        pos.x > game.center.x ? LEFT : RIGHT
-    });
-
-    if(dub)
+    if(points){
         display.push_back({
             "wave",
-            "x2b",
-            pos.x+(width*SCALE*2),
+            to_string(points/100),
+            pos.x,
             pos.y+height*SCALE,
             NULL,
             false,
             pos.x > game.center.x ? LEFT : RIGHT
         });
+
+        display.push_back({
+            "wave",
+            "00",
+            pos.x+width*SCALE,
+            pos.y+height*SCALE,
+            NULL,
+            false,
+            pos.x > game.center.x ? LEFT : RIGHT
+        });
+
+        if(dub)
+            display.push_back({
+                "wave",
+                "x2b",
+                pos.x+(width*SCALE*2),
+                pos.y+height*SCALE,
+                NULL,
+                false,
+                pos.x > game.center.x ? LEFT : RIGHT
+            });
+    }
 }
 
 void Points::reset(){

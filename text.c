@@ -18,7 +18,7 @@ void Text::init(vector<int> c, int w, int h){
 
 void Text::compile(){
     // array<char, 42> keys = {"0","1","2","3","4","5","6","7","8","9","a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","!","?",".","/","(c)","@"};
-    array<char, 42> keys = {'0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','!','?','.','/','%','@'};
+    array<char, 48> keys = {'0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','!','?','.','/','%','@','*','='};
 
     for(int c=0; c<colors.size(); c++){
         map<char, SDL_Texture*> characters;
@@ -112,6 +112,14 @@ int Text::getWidth(string text){
     return size*unit + ((size-1)*kern);
 }
 
+void Text::indent(string text, int color, int full, Coordinates c){
+    int offset = full - text.size();
+    for(int i=0; i<offset; i++){
+        text = " " + text;
+    }
+    render(text, color, c);
+}
+
 void Text::score(int sc, int digits){
     string s = to_string(sc);
     int offset = digits - s.size();
@@ -124,6 +132,15 @@ void Text::score(int sc, int digits){
 void Text::score(int sc){
     int digits = 10;
     score(sc, digits);
+}
+
+void Text::hiscore(){
+    string s = to_string(game.hiscore);
+    int offset = 10 - s.size();
+    for(int i=0; i<offset; i++){
+        s = " " + s;
+    }
+    render(s, RED, 15, 1);
 }
 
 // void Text::animate(){

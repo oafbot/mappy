@@ -1,13 +1,13 @@
 #include "game.hpp"
 using namespace std;
-Boss::Boss() : Enemy(){
+Boss::Boss() : Enemy(10){
     array <array<int, SPRITE_SIZE>, BITMAP_SIZE> b = data.sprites;
     array<array<int, SPRITE_SIZE>, FRAMES>
     f0 = {b[17], b[18], b[19], b[18], b[17], b[18], b[19], b[17]}, // left, right
     f1 = {b[23], b[23], b[23], b[23], b[23], b[23], b[23], b[23]}, // hop
     f2 = {b[20], b[20], b[21], b[21], b[20], b[20], b[21], b[21]}, // bounce
     f3 = {b[24]}, // hide
-    f4 = {b[22]}, // turned
+    f4 = {b[22], b[22], b[22], b[22], b[22], b[22], b[22], b[22]}, // turned
     f5 = {b[25]}; // bonus
 
     define("left", f0);
@@ -18,6 +18,7 @@ Boss::Boss() : Enemy(){
     define("bound", f2);
     define("turn", f4);
     define("hide", f3);
+    define("reward", f5);
 
     this->width  = DIM;
     this->height = DIM;
@@ -38,6 +39,8 @@ Boss::Boss() : Enemy(){
     this->cache       = &game.cache.boss;
 
     this->compile();
+    game.cache.reward = Draw::compile(data.items[16], DIM);
+
 
     collider->init(x + game.offset.x, y + game.offset.y, width, height);
 
@@ -52,10 +55,10 @@ void Boss::update(){
                 collider->passthru = true;
             }
             else if(bouncing && state!="hop-right" && state!="hop-left"){
-                state = "bound";
+                state = y<300 ? "turn" : "bound";
                 collider->passthru = true;
             }
-            else if(state=="hop-left" || state=="hop-right" || state=="hide"){
+            else if(state=="hop-left" || state=="hop-right" || state=="hide" || state=="reward"){
                 frame = 0;
                 collider->passthru = true;
             }
@@ -67,7 +70,7 @@ void Boss::update(){
                 collider->passthru = false;
             }
 
-            animated = (state=="hop-left" || state=="hop-right" || state=="hide") ? false : true;
+            animated = (state=="hop-left" || state=="hop-right" || state=="hide" || state=="reward") ? false : true;
 
             walk();
         }
@@ -91,20 +94,16 @@ void Boss::update(){
 
         collider->update(x+game.offset.x, y+game.offset.y);
     }
+    else if(released){
+        if(game.timer.done(regenerate)){
+            respawn();
+        }
+        else{
+            // x = game.center.x + game.offset.x + OFFSET - width*SCALE/2;
+            y = 100;
+        }
+    }
 }
-
-// void Boss::update(){
-//     Enemy::update();
-
-//     if(state=="hop-left" || state=="hop-right"){
-//         frame = 0;
-//         animated = false;
-//     }
-//     else{
-//         animated = true;
-//     }
-//     collider->update(x+game.offset.x, y+game.offset.y);
-// }
 
 void Boss::define(string name, array<array<int, SPRITE_SIZE>, FRAMES> frames){
     this->states.insert(make_pair(name.c_str(), frames));
@@ -189,6 +188,10 @@ void Boss::render(){
 
         SDL_SetTextureBlendMode((*cache)[state][frame], SDL_BLENDMODE_BLEND);
         SDL_RenderCopy(renderer, (*cache)[state][frame], &src, &dest);
+
+        if(state=="reward"){
+            Draw::render(game.cache.reward, x-width*SCALE/2+game.offset.x, y-width+game.offset.y);
+        }
     }
 }
 
@@ -218,6 +221,15 @@ void Boss::hide(int index){
     x = index%LEVEL_WIDTH*BYTE*SCALE;
 }
 
+void Boss::reward(){
+    game.timer.reset(hiding);
+    hiding = game.timer.start(2000);
+
+    state = "reward";
+    mode  = "HIDE";
+    collider->passthru = true;
+}
+
 void Boss::pounce(){
     // cout << "pounce" << endl;
     mode = "POUNCE";
@@ -245,28 +257,39 @@ void Boss::decision(){
     else{
         mode = "ROAM";
         collider->passthru = false;
-        // wander();
     }
 }
 
 void Boss::move(){
+    int tile;
     // cout << direction << endl;
-
     if(direction=="left"){
+        tile = adjacent(LEFT);
+
         if(traverse(LEFT)){
             state = "left";
             x -= BOSS_SPEED;
-        }else{
+        }
+        else if(rand()%2 && (tile==DOOR_LEFT || tile==DOOR_RIGHT)){
+            opendoor(LEFT);
+        }
+        else{
             state = "right";
             direction = "right";
             x += BOSS_SPEED;
         }
     }
     else if(direction=="right"){
+        tile = adjacent(RIGHT);
+
         if(traverse(RIGHT)){
             state = "right";
             x += BOSS_SPEED;
-        }else{
+        }
+        else if(rand()%2 && (tile==DOOR_LEFT || tile==DOOR_RIGHT)){
+            opendoor(LEFT);
+        }
+        else{
             state = "left";
             direction = "left";
             x -= BOSS_SPEED;
@@ -274,60 +297,13 @@ void Boss::move(){
     }
 }
 
-// void Boss::wander(){
-//     int r;
-
-//     if(state=="bound" || state=="drop"){
-//         if(x<150){
-//             state = "hop-right";
-//             direction = "right";
-//             hopoff();
-//         }
-//         else if(x>600){
-//             state = "hop-left";
-//             direction = "left";
-//             hopoff();
-//         }
-//         else{
-//             r = rand()%2;
-//             switch(r){
-//                 case 0:
-//                     state = "hop-left";
-//                     direction = "left";
-//                     hopoff();
-//                     break;
-//                 case 1:
-//                     state = "hop-right";
-//                     direction = "right";
-//                     hopoff();
-//                     break;
-//             }
-//         }
-//     }
-//     // else{
-//     //     r = rand() % 5;
-//     //     switch(r){
-//     //         case 0:
-//     //             direction = "left";
-//     //             state = "left";
-//     //             break;
-//     //         case 1:
-//     //             direction = "right";
-//     //             state = "right";
-//     //             break;
-//     //         default:
-//     //             break;
-//     //     }
-//     // }
-// }
-
-
 void Boss::walk(){
     if(mode!="HIDE"){
-        if(state!="bound" && state!="drop" && state!="hop-left" && state!="hop-right"){
+        // cout << state << endl;
+        if(state!="bound" && state!="drop" && state!="hop-left" && state!="hop-right" && state!="turn"){
             move();
         }
-        else if(state=="bound"){
+        else if(state=="bound" || state=="turn"){
             jump();
         }
         else if(state=="drop"){
@@ -348,7 +324,7 @@ void Boss::walk(){
         return;
     };
 
-    if(state!="bound" && state!="drop" && state!="hop-right" && state!="hop-left"){
+    if(state!="bound" && state!="drop" && state!="turn" && state!="hop-right" && state!="hop-left"){
         decision();
     }
     timestamp = SDL_GetTicks();
@@ -369,4 +345,12 @@ void Boss::reset(double x, double y){
     this->bounces     = -1;
     this->collider->passthru = false;
     this->collider->update(x+game.offset.x, y+game.offset.y);
+}
+
+void Boss::balloons(){
+    for(int i=0; i<game.balloons.size(); i++){
+        if(contains(game.balloons[i].group, index()) && !game.balloons[i].collected){
+            game.balloons[i].collect();
+        }
+    }
 }

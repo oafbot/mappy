@@ -1,7 +1,7 @@
 #include "game.hpp"
 using namespace std;
 
-Enemy::Enemy() : Sprite(){
+Enemy::Enemy(int id) : Sprite(){
     array <array<int, SPRITE_SIZE>, BITMAP_SIZE> b = data.sprites;
     array<array<int, SPRITE_SIZE>, FRAMES>
     f0 = {b[26], b[27], b[28], b[27], b[26], b[27], b[28], b[27]}, // left, right
@@ -18,6 +18,7 @@ Enemy::Enemy() : Sprite(){
     define("ko-left", flip(f3));
     define("ko-right", f3);
 
+    this->id = id;
     this->width  = DIM;
     this->height = DIM;
 
@@ -31,8 +32,12 @@ Enemy::Enemy() : Sprite(){
     this->frame       = 0;
     this->bounces     = -1;
     this->captured    = false;
+    this->released    = false;
+    this->speed       = ENEMY_SPEED;
     this->collider    = new Collider<Enemy>(this);
     this->cache       = &game.cache.enemy;
+    this->blink       = false;
+    this->blinkon     = {3,4,7,8};
 
     this->compile();
 };
@@ -115,7 +120,17 @@ void Enemy::define(string name, array<array<int, SPRITE_SIZE>, FRAMES> frames){
 
 void Enemy::update(){
     if(active){
-        if(state!="ko-left" && state!="ko-right" && !captured){
+        if(captured){
+            if(state == "right"){
+                x -= SPEED;
+                collider->passthru = true;
+            }
+            else if(state == "left"){
+                x += SPEED;
+                collider->passthru = true;
+            }
+        }
+        else if(state!="ko-left" && state!="ko-right"){
             if(this->falling && state!="hop-right" && state!="hop-left"){
                 this->state = "drop";
                 this->collider->passthru = true;
@@ -125,7 +140,6 @@ void Enemy::update(){
                 this->collider->passthru = true;
             }
             else if(this->falling || this->bouncing){
-                // this->state = this->direction=="left" ? "hop-left" : "hop-right";
                 this->collider->passthru = true;
             }
             else if(state=="hop-left" || state=="hop-right"){
@@ -137,17 +151,8 @@ void Enemy::update(){
             }
 
             walk();
+            spaceout();
             collider->update(x+game.offset.x, y+game.offset.y);
-        }
-        else if(captured){
-            if(state == "right"){
-                x -= SPEED;
-                collider->passthru = true;
-            }
-            else if(state == "left"){
-                x += SPEED;
-                collider->passthru = true;
-            }
         }
         else{
             if(state=="ko-left" && x>slide){
@@ -158,10 +163,47 @@ void Enemy::update(){
             }
 
             this->collider->passthru = true;
+
+            if(game.delay(3500, timestamp)){
+                return;
+            }
+
+            blink = true;
+
             if(game.delay(5000, timestamp)){
                 return;
             }
             respawn();
+        }
+    }
+    else if(released){
+        if(game.timer.done(regenerate)){
+            respawn();
+        }
+        else{
+            // x = game.center.x -(game.stage.width - (game.stage.width+game.offset.x+OFFSET)) - width*SCALE/2;
+            y = 100;
+        }
+    }
+}
+
+void Enemy::spaceout(){
+    if((state=="left" && adjacent(DOWN_RIGHT)) || (state=="right" && adjacent(DOWN_LEFT))){
+        for(int i=0; i<game.enemies.size(); i++){
+            if(id!=game.enemies[i].id){
+                if(collider->check(game.enemies[i].collider) && direction==game.enemies[i].direction){
+                    x = direction=="right" ? x-width*SCALE : x+width*SCALE;
+                }
+            }
+        }
+    }
+    else if(state=="bound" || state=="drop"){
+        for(int i=0; i<game.enemies.size(); i++){
+            if(id!=game.enemies[i].id){
+                if(collider->check(game.enemies[i].collider) && state==game.enemies[i].state){
+                    y = state=="drop" ? y-height*SCALE : y+height*SCALE;
+                }
+            }
         }
     }
 }
@@ -191,7 +233,8 @@ void Enemy::render(){
             }
         }
         SDL_SetTextureBlendMode((*cache)[state][frame], SDL_BLENDMODE_BLEND);
-        SDL_RenderCopy(renderer, (*cache)[state][frame], &src, &dest);
+        if(!blink || (blink && contains(blinkon, frame) ))
+            SDL_RenderCopy(renderer, (*cache)[state][frame], &src, &dest);
     }
 }
 
@@ -241,14 +284,20 @@ void Enemy::knockedout(int direction, double door_x){
 
 void Enemy::respawn(){
     // cout << "respawn" << endl;
-    this->x = game.center.x + OFFSET - width*SCALE;
-    this->y = 100;
+    game.timer.reset(regenerate);
+    // cout << game.center.x + game.offset.x/2 + OFFSET + width*SCALE << endl;
+    this->x = game.center.x + game.offset.x/2 + OFFSET/* + width*SCALE*/;
+    this->y = 95;
     this->frame = 0;
+    this->active   = true;
     this->falling  = true;
     this->bouncing = false;
     this->animated = true;
     this->captured = false;
-    this->direction = rand()%2 ? "left" : "right";
+    this->released = false;
+    this->blink    = false;
+    this->gravitation = true;
+    this->direction = x>game.center.x ? "left" : "right";
     this->state = direction=="left" ? "left" : "right";
     this->collider->update(x+game.offset.x, y+game.offset.y);
     this->collider->passthru = false;
@@ -364,6 +413,16 @@ bool Enemy::traverse(int direction){
     int tile = adjacent(direction);
 
     if(tile==0){
+        if(direction==RIGHT || direction==LEFT){
+            int shift = direction==RIGHT ? 1 : -1;
+
+            for(int i=0; i<game.doors.size(); i++){
+                if((contains(game.doors[i].group, index(x, y)+shift+LEVEL_WIDTH) ||
+                    contains(game.doors[i].group, index(x, y)+shift+LEVEL_WIDTH*2)) && !game.doors[i].open){
+                    return false;
+                }
+            }
+        }
         return true;
     }
     if(tile>=RADIO && tile<=BELL){
@@ -394,6 +453,16 @@ bool Enemy::traverse(int direction, double x, double y){
     int tile = adjacent(direction, x, y);
 
     if(tile==0){
+        if(direction==RIGHT || direction==LEFT){
+            int shift = direction==RIGHT ? 1 : -1;
+
+            for(int i=0; i<game.doors.size(); i++){
+                if((contains(game.doors[i].group, index(x, y)+shift+LEVEL_WIDTH) ||
+                    contains(game.doors[i].group, index(x, y)+shift+LEVEL_WIDTH*2)) && !game.doors[i].open){
+                    return false;
+                }
+            }
+        }
         return true;
     }
     if(tile>=RADIO && tile<=BELL){
@@ -420,27 +489,51 @@ bool Enemy::traverse(int direction, double x, double y){
     return false;
 }
 
+void Enemy::opendoor(int direction){
+    int ix = direction==LEFT ? index(x, y)-1 : index(x, y)+1;
+
+    for(int i=0; i<game.doors.size(); i++){
+        if(contains(game.doors[i].group, ix)){
+            game.doors[i].operate();
+            break;
+        }
+    }
+}
+
 void Enemy::move(){
+    int tile;
     // cout << direction << endl;
 
     if(direction=="left"){
+        tile = adjacent(LEFT);
+
         if(traverse(LEFT)){
             state = "left";
-            x -= ENEMY_SPEED;
-        }else{
+            x -= speed;
+        }
+        else if(rand()%2 && (tile==DOOR_LEFT || tile==DOOR_RIGHT)){
+            opendoor(LEFT);
+        }
+        else{
             state = "right";
             direction = "right";
-            x += ENEMY_SPEED;
+            x += speed;
         }
     }
     else if(direction=="right"){
+        tile = adjacent(RIGHT);
+
         if(traverse(RIGHT)){
             state = "right";
-            x += ENEMY_SPEED;
-        }else{
+            x += speed;
+        }
+        else if(rand()%2 && (tile==DOOR_LEFT || tile==DOOR_RIGHT)){
+            opendoor(RIGHT);
+        }
+        else{
             state = "left";
             direction = "left";
-            x -= ENEMY_SPEED;
+            x -= speed;
         }
     }
 }
@@ -481,7 +574,7 @@ void Enemy::hopoff(){
 void Enemy::wander(){
     int r;
 
-    if(state=="bound" || state=="drop"){
+    if(state=="bound" || state=="drop" || state=="turn"){
         if(x<150){
             state = "hop-right";
             direction = "right";
@@ -508,29 +601,29 @@ void Enemy::wander(){
             }
         }
     }
-    else{
-        r = rand() % 5;
-        switch(r){
-            case 0:
-                direction = "left";
-                state = "left";
-                break;
-            case 1:
-                direction = "right";
-                state = "right";
-                break;
-            default:
-                break;
-        }
-    }
+    // else{
+    //     r = rand() % 5;
+    //     switch(r){
+    //         case 0:
+    //             direction = "left";
+    //             state = "left";
+    //             break;
+    //         case 1:
+    //             direction = "right";
+    //             state = "right";
+    //             break;
+    //         default:
+    //             break;
+    //     }
+    // }
 }
 
 void Enemy::pursue(){
-    if(player.x < x){
+    if(player.x < x && x-player.x>DIM){
         direction = "left";
         state = "left";
     }
-    else if(player.x >= x){
+    else if(player.x >= x && player.x-x>DIM){
         direction = "right";
         state = "right";
     }
@@ -565,15 +658,19 @@ void Enemy::bounce(){
 }
 
 void Enemy::jump(){
-    int row  = LEVEL_HEIGHT-(index(x, y)/LEVEL_WIDTH); //index(x, y)/LEVEL_HEIGHT;
-    // cout << row << " / " << FLOOR_HEIGHT << " = " << (row/FLOOR_HEIGHT) << endl;
-    int pos  = (row/FLOOR_HEIGHT); //game.tiers-((row-10)/game.tiers);
-    int plyr = LEVEL_HEIGHT-(player.index(player.x, player.y)/LEVEL_WIDTH); //player.index(player.x, player.y)/LEVEL_HEIGHT;
+    int row  = LEVEL_HEIGHT-(index(x, y)/LEVEL_WIDTH);
+    int pos  = (row/FLOOR_HEIGHT);
+    int plyr = LEVEL_HEIGHT-(player.index(player.x, player.y)/LEVEL_WIDTH);
 
-    // cout << "player: " << plyr << endl;
-    // cout << "pos: " << pos << endl;
+    // if(type=="boss") cout << pos << ", " << tier << endl;
 
-    if(type!="boss" && row==plyr){
+    if(bounces<0){
+        wander();
+    }
+    else if(pos==tier && bounces==0){
+        wander();
+    }
+    else if(type!="boss" && row==plyr){
         if(player.x < x){
             direction = "left";
             state = "hop-left";
@@ -583,13 +680,6 @@ void Enemy::jump(){
             state = "hop-right";
         }
         hopoff();
-    }
-
-    else if(pos==tier && bounces==0){
-        wander();
-    }
-    else if(bounces<0){
-        wander();
     }
 }
 
@@ -602,10 +692,10 @@ void Enemy::walk(){
     }
     else if(state=="drop"){
         if(direction=="left" && !aligned()){
-             x -= ENEMY_SPEED;
+             x -= speed;
         }
         else if(direction=="right" && !aligned()){
-            x += ENEMY_SPEED;
+            x += speed;
         }
     }
     else if(state=="hop-left" || state=="hop-right"){
@@ -616,7 +706,8 @@ void Enemy::walk(){
         return;
     };
 
-    if(state!="bound" && state!="drop" && state!="hop-right" && state!="hop-left"){
+    // if(state!="bound" && state!="drop" && state!="hop-right" && state!="hop-left"){
+    if(state=="bound" || state=="drop" || state=="turn"){
         decision();
     }
 
@@ -635,9 +726,26 @@ void Enemy::reset(double x, double y){
     this->frame       = 0;
     this->animated    = true;
     this->active      = true;
+    this->blink       = false;
     this->bounces     = -1;
     this->collider->passthru = false;
     this->collider->update(x+game.offset.x, y+game.offset.y);
+
+    if(game.level<3){
+        speed = ENEMY_SPEED;
+    }
+    else if(game.level<7){
+        speed = ENEMY_SPEED*1.25;
+    }
+    else if(game.level<11){
+        speed = ENEMY_SPEED*1.5;
+    }
+    else if(game.level<15){
+        speed = ENEMY_SPEED*1.75;
+    }
+    else{
+        speed = ENEMY_SPEED*2;
+    }
 }
 
 void Enemy::deactivate(){
@@ -664,9 +772,11 @@ void Enemy::capture(int direction){
     }
 }
 
-void Enemy::release(){
-    // cout << " release" << endl;
-    gravitation = true;
+void Enemy::release(int delay){
+    // cout << " release " << type <<endl;
+    game.timer.reset(regenerate);
+    regenerate = game.timer.start(delay*500);
     captured = false;
-    respawn();
+    released = true;
+    active = false;
 }

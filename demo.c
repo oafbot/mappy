@@ -1,7 +1,11 @@
 Demo::Demo(){
+    array<array<int, TILE_SIZE>, 9> bits;
     title = * new Title();
     title.compile();
     lines = { "namcopy presents", "% 2020 namcopy", "starring" };
+    bits = {data.tiles[129],data.tiles[130],data.tiles[131],data.tiles[132],data.tiles[133],data.tiles[134],data.tiles[135],data.tiles[136],data.tiles[137]};
+    logo = Draw::compile(bits, 9, 8);
+    Draw::clear();
 }
 
 void Demo::scrollLeft(string text, int pos, int inc, int color){
@@ -52,7 +56,12 @@ void Demo::start(){
     Coordinates c2 = { (double)game.stage.right + game.text.getWidth(lines[0]), (double)2*game.text.unit };
     position.push_back(c2);
 
+    logox = game.center.x-64;
+    Draw::render(logo, logox, 33*8*SCALE);
     scene = 0;
+
+    game.timer.reset(game.timeout);
+    game.timeout = game.timer.start(2000);
 }
 
 void Demo::cast(){
@@ -96,6 +105,8 @@ void Demo::animate(){
         scrollLeft(lines[0], 0, SCALE, 2);
         scrollLeft(lines[1], 1, SCALE, 2);
         scrollLeft(lines[2], 2, SCALE, 42);
+        logox -= SCALE;
+        Draw::render(logo, logox, 33*8*SCALE);
         title.display();
     }
     else{

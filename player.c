@@ -62,6 +62,11 @@ void Player::move(){
                 bouncing = false;
             }
         }
+        else if(bouncing){
+            if( !game.interval() ){ return; }
+            bouncing = false;
+            falling = true;
+        }
     }
 
     if( game.controls.right_key_down && !game.controls.lock) {
@@ -82,17 +87,41 @@ void Player::move(){
                 bouncing = false;
             }
         }
+        else if(bouncing){
+            if( !game.interval() ){ return; }
+            bouncing = false;
+            falling = true;
+        }
     }
 }
 
 bool Player::traverse(int direction){
     int tile = adjacent(direction);
     if(tile==0){
+        if(direction==RIGHT || direction==LEFT){
+            int shift = direction==RIGHT ? 1 : -1;
+
+            for(int i=0; i<game.doors.size(); i++){
+                if((contains(game.doors[i].group, index(x, y)+shift+LEVEL_WIDTH) ||
+                    contains(game.doors[i].group, index(x, y)+shift+LEVEL_WIDTH*2)) && !game.doors[i].open){
+                    return false;
+                }
+            }
+        }
         return true;
     }
-    if(tile>=RADIO && tile<=BELL){
+
+    if(tile>=RADIO && tile<=BONUS_BALLOON){
         return true;
     }
+    // if(tile==BALLOON){
+    //     return true;
+    // }
+
+    // if(tile==BONUS_BALLOON){
+    //     return true;
+    // }
+
     if(tile>=DOOR_LEFT && tile<=MAGIC_DOOR_R){
         switch(direction){
             case RIGHT:
@@ -111,20 +140,35 @@ bool Player::traverse(int direction){
                 break;
         }
     }
-    if(tile==BALLOON){
-        return true;
-    }
+
     return false;
 }
 
 bool Player::traverse(int direction, double x, double y){
     int tile = adjacent(direction, x, y);
     if(tile==0){
+        int shift = direction==RIGHT ? 1 : -1;
+
+        for(int i=0; i<game.doors.size(); i++){
+            if((contains(game.doors[i].group, index(x, y)+shift+LEVEL_WIDTH) ||
+                contains(game.doors[i].group, index(x, y)+shift+LEVEL_WIDTH*2)) && !game.doors[i].open){
+                return false;
+            }
+        }
+
         return true;
     }
-    if(tile>=RADIO && tile<=BELL){
+
+    if(tile>=RADIO && tile<=BONUS_BALLOON){
         return true;
     }
+    // if(tile==BALLOON){
+    //     return true;
+    // }
+    // if(tile==BONUS_BALLOON){
+    //     return true;
+    // }
+
     if(tile>=DOOR_LEFT && tile<=MAGIC_DOOR_R){
         switch(direction){
             case RIGHT:
@@ -136,7 +180,7 @@ bool Player::traverse(int direction, double x, double y){
                 break;
             case LEFT:
                 for(int i=0; i<game.doors.size(); i++){
-                    cout << (contains(game.doors[i].group, index(x, y)+1) && game.doors[i].open) << endl;
+                    // cout << (contains(game.doors[i].group, index(x, y)-1) && game.doors[i].open) << endl;
                     if(contains(game.doors[i].group, index(x, y)-1) && game.doors[i].open){
                         return true;
                     }
@@ -144,9 +188,10 @@ bool Player::traverse(int direction, double x, double y){
                 break;
         }
     }
-    if(tile==BALLOON){
-        return true;
+    else{
+
     }
+
     return false;
 }
 
@@ -360,12 +405,10 @@ void Player::update(){
         game.scrolling = false;
     }
     else if(x>game.center.x-OFFSET && x+width<game.center.x+OFFSET){
-         game.scrolling = true;
+        game.scrolling = true;
     }
 
     ledge();
-    collider->update(x, y);
-
     collect();
     collision();
 }
@@ -381,12 +424,23 @@ void Player::collect(){
             }
         }
     }
-
+    else if(tile==BELL){
+        for(int i=0; i<game.bells.size(); i++){
+            if(contains(game.bells[i].group, pos) && !game.bells[i].dropped){
+                game.bells[i].drop();
+            }
+        }
+    }
     else if(tile==BALLOON){
         for(int i=0; i<game.balloons.size(); i++){
             if(contains(game.balloons[i].group, pos) && !game.balloons[i].collected){
                 game.balloons[i].collect();
             }
+        }
+    }
+    else if(tile==BONUS_BALLOON){
+        if(contains(game.bonus_balloon.group, pos) && !game.bonus_balloon.collected){
+            game.bonus_balloon.collect();
         }
     }
 }
@@ -420,15 +474,21 @@ void Player::deaded(){
         falling  = false;
         dead = true;
         game.controls.lock = true;
-        game.lives -= 1;
         timestamp = SDL_GetTicks();
+        game.sound.effects.stop();
         game.stopBGM();
-        game.sound.effects.play("dead");
+
+        if(game.state!="BONUS_ROUND"){
+            game.sound.effects.play("dead");
+            game.lives -= 1;
+        }
     }
 }
 
 void Player::collision(){
-    if(!dead)
+    if(!dead){
+        collider->update(x, y);
+
         for(int i=0; i<game.enemies.size(); i++){
             if(collider->check(game.enemies[i].collider)){
                 deaded();
@@ -439,6 +499,17 @@ void Player::collision(){
         if(collider->check(goro.collider)){
             deaded();
         }
+
+        if(collider->check(goro.collider)){
+            deaded();
+        }
+
+        // for(int i=0; i<game.bells.size(); i++){
+        //     if(collider->check(game.bells[i].collider) && !game.bells[i].dropped){
+        //         game.bells[i].drop();
+        //     }
+        // }
+    }
 }
 
 void Player::bounce(){
@@ -450,7 +521,17 @@ void Player::bounce(){
 void Player::door(){
     for(int i=0; i<game.doors.size(); i++){
         if(game.doors[i].range()){
-            game.doors[i].operate(index(x, y));
+            game.doors[i].operate();
+
+            if((abs(game.doors[i].x+game.offset.x-x)<width*SCALE*1.5&&game.doors[i].direction==RIGHT)||
+               (abs(game.doors[i].x+game.offset.x-x)<width*SCALE*1.5&&game.doors[i].direction==LEFT)){
+                if(game.doors[i].direction==LEFT && x<=game.doors[i].x+game.offset.x && game.doors[i].open){
+                    x-=width*SCALE;
+                }
+                else if(game.doors[i].direction==RIGHT && x>=game.doors[i].x+game.offset.x && game.doors[i].open){
+                    x+=width*SCALE;
+                }
+            }
             break;
         }
     }

@@ -15,17 +15,21 @@ Stage::Stage(int w, int h){
 Game::Game() : stage(0,0){
     SDL_Init( SDL_INIT_VIDEO | SDL_INIT_AUDIO );
 
-    this->level     = 1;
+    this->level     = START_LEVEL;
     this->PAUSED    = false;
     this->RESET     = false;
     this->COMPLETE  = false;
+    this->perfect   = false;
+    this->bonus     = false;
     this->scrolling = true;
     this->offset.x  = -182;
     this->offset.y  = 0;
     this->score     = 0;
+    this->hiscore   = 0;
     this->pickup    = -1;
     this->factor    = 2;
     this->lives     = 3;
+    this->lifeup    = 20000;
     this->tiers     = FLOORS;
     this->mapper    = * new Mapper();
     this->controls  = * new Control();
@@ -34,12 +38,29 @@ Game::Game() : stage(0,0){
     this->text      = * new Text();
     this->controls.lock = false;
     this->state = "LOADING";
+
 }
 
 void Game::update(){
-    if(mode==PLAY){
-        if(collected.size()==10){
+    if(state=="GAME_OVER"){
+        gameover();
+    }
+    else if(state=="RESTART"){
+        if(timer.done(timeout)){
+            timer.reset(timeout);
+            reset();
+        }
+    }
+    else if(mode==PLAY){
+        if(state!="BONUS_ROUND" && collected.size()==10){
             complete();
+        }
+        else if(lives<=0 && !GAME_OVER){
+            if(state!="GAME_OVER"){
+                timer.reset(timeout);
+                timeout = timer.start(2000);
+            }
+            state = "GAME_OVER";
         }
         else{
             if(!sound.music.playing() && music) playBGM();
@@ -63,12 +84,36 @@ void Game::update(){
                     doors[i].wave.update();
                 }
             }
+
+            for(int b=0; b<bells.size(); b++){
+                if(bells[b].assigned) bells[b].update();
+            }
         }
         else{
             music = OFF;
             if(!sound.music.playing()){
                 complete();
             }
+
+            if(bonus_balloon.collected){
+                goro.y -= SPEED*SCALE;
+                goro.balloons();
+            }
+        }
+
+        for(int t=0; t<trampolines.size(); t++){
+            trampolines[t].update();
+        }
+
+
+        if(score>lifeup){
+            lifeup = lifeup==20000 ? 70000 : lifeup+70000;
+            lives += 1;
+            cout << "next life: " << lifeup << endl;
+        }
+
+        if(score>hiscore){
+            hiscore = score;
         }
     }
     else if(state=="CLEAR_SCREEN"){
@@ -123,6 +168,12 @@ void Game::renderObjects(){
     for(int i=0; i<items.size(); i++){
         items[i].render();
     }
+
+    for(int i=0; i<bells.size(); i++){
+        // bells[i].collider->debug();
+        bells[i].render();
+    }
+
     for(int i=0; i<enemies.size(); i++){
         // enemies[i].collider->debug();
         enemies[i].render();
@@ -132,6 +183,13 @@ void Game::renderObjects(){
         for(int i=0; i<balloons.size(); i++){
             balloons[i].render();
         }
+        bonus_balloon.render();
+    }
+}
+
+void Game::renderLives(){
+    for(int i=0; i<lives; i++){
+        Draw::render(cache.badge, 0+BYTE+i*DIM*SCALE, stage.height-BYTE-DIM*SCALE);
     }
 }
 
@@ -144,9 +202,16 @@ void Game::render(){
     player.render();
     mapper.render("foreground");
     points.render();
+    renderLives();
 
-    if(state!="BONUS_ROUND")
-        game.text.score(game.score);
+    if(state!="BONUS_ROUND"){
+        text.score(game.score);
+        text.hiscore();
+    }
+
+    if(GAME_OVER){
+        Draw::render(cache.gameover, center.x-32, center.y);
+    }
 
     last_time = current_time;
 }
@@ -182,10 +247,24 @@ void Game::loop(){
             this->music = ON;
             PAUSED = false;
         }
-
     }
 }
 
+void Game::gameover(){
+
+    if(!interval()){ return; }
+
+    if(timer.done(timeout) && !GAME_OVER){
+        state = "RESTART";
+        GAME_OVER = true;
+
+        timer.reset(timeout);
+        timeout = timer.start(10000);
+
+        if(!sound.effects.playing(4))
+            sound.effects.play("gameover", 4);
+    }
+}
 
 void Game::setup(){
     int key;
@@ -235,6 +314,25 @@ void Game::setup(){
                         }
                     }
                     break;
+                case BONUS_BALLOON:
+                    bonus_balloon.assign(i);
+                    skip.push_back(i);
+                    skip.push_back(i+1);
+                    skip.push_back(i+2);
+                    skip.push_back(i+3);
+                    skip.push_back(i+LEVEL_WIDTH);
+                    skip.push_back(i+LEVEL_WIDTH+1);
+                    skip.push_back(i+LEVEL_WIDTH+2);
+                    skip.push_back(i+LEVEL_WIDTH+3);
+                    skip.push_back(i+LEVEL_WIDTH*2);
+                    skip.push_back(i+LEVEL_WIDTH*2+1);
+                    skip.push_back(i+LEVEL_WIDTH*2+2);
+                    skip.push_back(i+LEVEL_WIDTH*2+3);
+                    skip.push_back(i+LEVEL_WIDTH*3);
+                    skip.push_back(i+LEVEL_WIDTH*3+1);
+                    skip.push_back(i+LEVEL_WIDTH*3+2);
+                    skip.push_back(i+LEVEL_WIDTH*3+3);
+                    break;
                 case RADIO:
                 case TV:
                 case COMPUTER:
@@ -253,6 +351,19 @@ void Game::setup(){
                         }
                     }
                     break;
+                case BELL:
+                    for(int b=0; b<bells.size(); b++){
+                        if(!bells[b].assigned){
+                            skip.push_back(i);
+                            skip.push_back(i+1);
+                            skip.push_back(i+LEVEL_WIDTH);
+                            skip.push_back(i+LEVEL_WIDTH+1);
+
+                            bells[b].assign(i);
+                            break;
+                        }
+                    }
+                    break;
             }
         }
     }
@@ -266,10 +377,12 @@ void Game::start(){
     sound.music.load("bonus", AUDIO_BONUS);
     sound.music.load("fanfare", AUDIO_FANFARE);
     sound.music.load("results", AUDIO_RESULTS);
+    sound.effects.load("gameover", AUDIO_GAME_OVER);
     sound.effects.load("dead",  AUDIO_DEAD);
     sound.effects.load("clear", AUDIO_CLEAR);
     sound.effects.load("item",  AUDIO_ITEM);
     sound.effects.load("wave",  AUDIO_WAVE);
+    sound.effects.load("bell",  AUDIO_BELL);
     sound.effects.load("start", AUDIO_START);
     sound.effects.load("trampoline", AUDIO_JUMP);
 
@@ -286,12 +399,15 @@ void Game::start(){
     }
     else{
         player.reset(620, 160);
-        // goro.reset(770, 160);
+        goro.reset(32, 450);
+        goro.gravitation = false;
+        goro.state = "bound";
     }
 
     this->mode  = PLAY;
     this->music = OFF;
     this->playBGM();
+    controls.lock = false;
 }
 
 void Game::init(int w, int h){
@@ -302,6 +418,7 @@ void Game::init(int w, int h){
     text.init({WHITE,RED,GREEN,BLUE,YELLOW,ORANGE,PINK}, w, h);
 
     this->PAUSED = true;
+    controls.lock = true;
 
     this->stage = * new Stage(w, h);
     this->center.x = this->stage.width/2;
@@ -337,12 +454,18 @@ void Game::init(int w, int h){
         }
     }
 
-    for(int b=0; b<16; b++){
-        balloons.push_back(* new Balloon());
+    for(int i=0; i<2; i++){
+        bells.push_back(* new Bell());
     }
 
+    for(int b=0; b<16; b++){
+        balloons.push_back(* new Balloon(false));
+    }
+
+    bonus_balloon = * new Balloon(true);
+
     for(int i=0; i<9; i++){
-        Enemy mewkie = * new Enemy();
+        Enemy mewkie = * new Enemy(i);
         mewkie.init(data.spawn[i][0], data.spawn[i][1]);
         mewkie.gravity = physics.gravity(0.125, 0);
         mewkie.id = i;
@@ -358,6 +481,14 @@ void Game::init(int w, int h){
     goro.init(0,0);
     goro.gravity = physics.gravity(0.125, 0);
     goro.active = true;
+
+    array<array<int, SPRITE_SIZE>,1> badge = {data.items[17]};
+    cache.badge = Draw::compile(badge, 1, DIM);
+    Draw::clear();
+
+    array<array<int, SPRITE_SIZE>,2> go = {data.items[26], data.items[27]};
+    cache.gameover = Draw::compile(go, 2, DIM);
+    Draw::clear();
 
     timeout = timer.start(1500);
 
@@ -452,10 +583,68 @@ void Game::complete(){
 void Game::results(){
     mode = DISPLAY;
 
+    double HEADING = 6;
+
+    text.center("earnings", PINK, HEADING);
+
     if(state!="BONUS_RESULTS"){
         clear();
         state = "BONUS_RESULTS";
         sound.music.play("results");
+
+
+        bonus = contains(collected, 2000);
+
+        if(collected.size()>15 && bonus){
+            perfect = true;
+            score += 5000;
+        }
+
+        timestamp = SDL_GetTicks();
+    }
+    else{
+        int balloons = bonus ? collected.size()-1 : collected.size();
+
+        if(!delay(2000, timestamp)){
+            mapper.draw(data.items[15], {center.x-10*BYTE*SCALE, (HEADING+4)*BYTE*SCALE});
+            text.render("200 * ", WHITE, {game.center.x-7*BYTE*SCALE, (HEADING+5)*BYTE*SCALE});
+        }
+        if(!delay(2500, timestamp)){
+            text.render(to_string(balloons), YELLOW, {game.center.x-BYTE*SCALE, (HEADING+5)*BYTE*SCALE});
+            text.render(" = ", WHITE, {game.center.x+2*BYTE*SCALE,(HEADING+5)*BYTE*SCALE});
+        }
+        if(!delay(2750, timestamp)){
+            text.indent(to_string(200*balloons), RED, 4, {game.center.x+6*BYTE*SCALE, (HEADING+5)*BYTE*SCALE});
+        }
+
+        if(!delay(4000, timestamp)){
+            text.render("2000 * ", WHITE, {game.center.x-7*BYTE*SCALE, (HEADING+10)*BYTE*SCALE});
+        }
+        if(!delay(4500, timestamp)){
+            text.render((bonus ? " 1" : " 0"), YELLOW, {game.center.x-BYTE*SCALE, (HEADING+10)*BYTE*SCALE});
+            text.render(" = ", WHITE, {game.center.x+2*BYTE*SCALE, (HEADING+10)*BYTE*SCALE});
+        }
+        if(!delay(4750, timestamp)){
+            text.indent((bonus ? "2000" : "000"), BLUE, 4, {game.center.x+6*BYTE*SCALE, (HEADING+10)*BYTE*SCALE});
+        }
+
+        if(!delay(6000, timestamp)){
+            text.render("perfect game = ", WHITE, {game.center.x-10*BYTE*SCALE, (HEADING+15)*BYTE*SCALE});
+        }
+        if(!delay(6500, timestamp)){
+            text.indent((perfect ? "5000" : "000"), YELLOW, 4, {game.center.x+6*BYTE*SCALE, (HEADING+15)*BYTE*SCALE});
+        }
+
+        if(!delay(8000, timestamp)){
+            text.render("total", ORANGE, {game.center.x-3*BYTE*SCALE, (HEADING+23)*BYTE*SCALE});
+        }
+        if(!delay(8500, timestamp)){
+            text.render(" = ", WHITE, {game.center.x+2*BYTE*SCALE, (HEADING+23)*BYTE*SCALE});
+        }
+        if(!delay(8750, timestamp)){
+            text.indent(to_string(200*balloons + (bonus ? 2000 : 0) + (perfect ? 5000 : 0)), GREEN, 4,
+                        {game.center.x+6*BYTE*SCALE, (HEADING+23)*BYTE*SCALE});
+        }
     }
 
     if(timer.done(timeout)){
@@ -502,6 +691,8 @@ void Game::restage(){
         this->scrolling = true;
         this->pickup    = -1;
         this->factor    = 2;
+        this->perfect   = false;
+        this->bonus     = false;
 
         if(!isBonusRound(level)){
             state="RUNNING";
@@ -513,6 +704,8 @@ void Game::restage(){
             for(int i=0; i<balloons.size(); i++){
                 balloons[i].reset();
             }
+
+            bonus_balloon.reset();
         }
 
         for(int t=0; t<trampolines.size(); t++){
@@ -529,6 +722,10 @@ void Game::restage(){
             items[i].reset();
         }
 
+        for(int i=0; i<bells.size(); i++){
+            bells[i].reset();
+        }
+
         for(int i=0; i<enemies.size(); i++){
             enemies[i].deactivate();
         }
@@ -540,9 +737,13 @@ void Game::restage(){
         setup();
 
         points.reset();
+        collected.clear();
 
         if(state=="BONUS_ROUND"){
             player.reset(620, 160);
+            goro.reset(32, 450);
+            goro.gravitation = false;
+            goro.state = "bound";
         }
         else{
             player.reset(580, 480);
@@ -603,19 +804,24 @@ void Game::restart(){
     this->offset.y  = 0;
     this->pickup    = -1;
 
-    this->mode = PLAY;
+    this->mode  = PLAY;
     this->music = ON;
 }
 
 void Game::reset(){
-    stopBGM();
     level = 0;
-    clear();
-    collected.clear();
     state = "CLEAR_SCREEN";
+    collected.clear();
+    clear();
+    stopBGM();
     restage();
     PAUSED = true;
+    perfect = false;
+    bonus = false;
+    lives = 3;
+    score = 0;
     mode = DISPLAY;
     demo.start();
     state = "START_SCREEN";
+    GAME_OVER = false;
 }

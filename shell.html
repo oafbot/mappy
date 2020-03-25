@@ -5,10 +5,25 @@
     	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     	<title>Mappy</title>
     	<link href="index.css" rel="stylesheet" type="text/css">
+    	<!--
+    	<script type="text/javascript" src="js/svg.min.js"></script>
+    	<script type="text/javascript" src="js/bitmap.js"></script>
+    	<script type="text/javascript" src="js/game.js"></script>
+    	<script type="text/javascript" src="js/sprite.js"></script>
+    	<script type="text/javascript" src="js/main.js"></script>
+    	-->
   	</head>
   	<body>
     	<div id="screen">
         	<canvas id="canvas" width="800" height="600" oncontextmenu="event.preventDefault()"></canvas>
+			<!--
+			<div class="lds-spinner" id="loader">
+        		<div></div><div></div><div></div><div></div><div></div><div></div>
+        		<div></div><div></div><div></div><div></div><div></div><div></div>
+        	</div>
+        	-->
+			<div class="lds-ellipsis" id="loader"><div></div><div></div><div></div><div></div></div>
+			<!-- <div class="lds-ripple" id="loader"><div></div><div></div></div> -->
     	</div>
    		<!-- <textarea class="em_textarea" id="output" rows="8"></textarea> -->
     	<script type='text/javascript'>
@@ -16,6 +31,7 @@
 	    var img = null;
 	    var canvas = null;
 	    var ctx = null;
+	    var spinner;
 
 	    function ModuleLoading(){
 			canvas = document.getElementById('canvas');
@@ -27,6 +43,8 @@
 	    function ModuleLoaded() {
 	    	canvas = document.getElementById('canvas');
 	    	ctx = canvas.getContext("2d");
+	    	spinner = document.getElementById('loader');
+	    	spinner.remove();
 	    }
 
 	    var Module = {
