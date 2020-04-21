@@ -29,6 +29,8 @@ Game::Game() : stage(0,0){
     this->pickup    = -1;
     this->factor    = 2;
     this->lives     = 3;
+    this->overtime  = 0;
+    this->round     = 0;
     this->lifeup    = 20000;
     this->tiers     = FLOORS;
     this->mapper    = * new Mapper();
@@ -38,10 +40,12 @@ Game::Game() : stage(0,0){
     this->text      = * new Text();
     this->controls.lock = false;
     this->state = "LOADING";
-
+    this->ms_per_frame = 100;  // animate at 10 fps
 }
 
 void Game::update(){
+    clock();
+
     if(state=="GAME_OVER"){
         gameover();
     }
@@ -87,6 +91,13 @@ void Game::update(){
 
             for(int b=0; b<bells.size(); b++){
                 if(bells[b].assigned) bells[b].update();
+            }
+
+            if(time>TIME_LIMIT){
+                overlimit();
+            }
+            else if(time>OVERTIME){
+                speedup();
             }
         }
         else{
@@ -144,9 +155,56 @@ bool Game::delay(int delay, Uint32 start){
     return false;
 }
 
-// void Game::clock(){
-//     timestamp = SDL_GetTicks();
-// }
+void Game::warning(){
+    if(hurry>stage.left-DIM*SCALE){
+        hurry -= SPEED*SCALE*8;
+        Draw::render(cache.hurry, hurry, center.y-DIM*SCALE);
+    }
+}
+
+void Game::speedup(){
+    if(!overtime){
+        hurry = stage.right+DIM*SCALE;
+        overtime += 1;
+        for(int i=0; i<enemies.size(); i++){
+            // enemies[i].speed = enemies[i].speed + (0.5*overtime);
+            enemies[i].speed = ENEMY_SPEED*1.8;
+        }
+
+        enemies[7].reset(data.spawn[7][0], data.spawn[7][1]);
+        enemies[8].reset(data.spawn[8][0], data.spawn[8][1]);
+
+        stopBGM();
+        sound.effects.play("hurryx1", 7);
+    }
+    else if(!sound.music.playing() && !sound.effects.playing(7) && !player.dead && !COMPLETE){
+        music = ON;
+        playBGM();
+    }
+}
+
+void Game::overlimit(){
+    if(overtime<2){
+        overtime += 1;
+        hurry = stage.right+DIM*SCALE;
+
+        stopBGM();
+        sound.effects.play("hurryx2", 7);
+        gosenzo.active = true;
+        gosenzo.direction = gosenzo.x+offset.x<player.x ? "right" : "left";
+    }
+    else if(!sound.music.playing() && !sound.effects.playing(7) && !player.dead && !COMPLETE){
+        music = ON;
+        playBGM();
+    }
+
+    gosenzo.update();
+}
+
+void Game::clock(){
+    current_time = SDL_GetTicks();
+    time = current_time - start_time - delta;
+}
 
 void Game::renderObjects(){
     for(int i=0; i<trampolines.size(); i++){
@@ -162,8 +220,10 @@ void Game::renderObjects(){
         }
     }
 
-    // goro.collider->debug();
     goro.render();
+    gosenzo.render();
+    // goro.collider->debug();
+    // gosenzo.collider->debug();
 
     for(int i=0; i<items.size(); i++){
         items[i].render();
@@ -210,7 +270,11 @@ void Game::render(){
     }
 
     if(GAME_OVER){
-        Draw::render(cache.gameover, center.x-32, center.y);
+        Draw::render(cache.gameover, center.x-32, center.y-DIM*SCALE/2);
+    }
+
+    if(overtime>0){
+        warning();
     }
 
     last_time = current_time;
@@ -263,13 +327,14 @@ void Game::gameover(){
 
         if(!sound.effects.playing(4))
             sound.effects.play("gameover", 4);
+
+        EM_ASM( GameOver() );
     }
 }
 
 void Game::setup(){
     int key;
     bool found;
-    // vector<int>::iterator it;
 
     for(int i=0; i<LEVEL_SIZE; i++){
         key = data.interactive[level-1][i];
@@ -372,42 +437,48 @@ void Game::setup(){
 }
 
 void Game::start(){
-    sound.init();
-    sound.music.load("theme", AUDIO_THEME);
-    sound.music.load("bonus", AUDIO_BONUS);
-    sound.music.load("fanfare", AUDIO_FANFARE);
-    sound.music.load("results", AUDIO_RESULTS);
-    sound.effects.load("gameover", AUDIO_GAME_OVER);
-    sound.effects.load("dead",  AUDIO_DEAD);
-    sound.effects.load("clear", AUDIO_CLEAR);
-    sound.effects.load("item",  AUDIO_ITEM);
-    sound.effects.load("wave",  AUDIO_WAVE);
-    sound.effects.load("bell",  AUDIO_BELL);
-    sound.effects.load("start", AUDIO_START);
-    sound.effects.load("trampoline", AUDIO_JUMP);
+    if(state=="START_SCREEN"){
+        sound.init();
+        sound.music.load("theme", AUDIO_THEME);
+        sound.music.load("bonus", AUDIO_BONUS);
+        sound.music.load("fast",  AUDIO_FAST);
+        sound.music.load("fanfare", AUDIO_FANFARE);
+        sound.music.load("results", AUDIO_RESULTS);
+        sound.effects.load("gameover", AUDIO_GAME_OVER);
+        sound.effects.load("dead",  AUDIO_DEAD);
+        sound.effects.load("clear", AUDIO_CLEAR);
+        sound.effects.load("item",  AUDIO_ITEM);
+        sound.effects.load("wave",  AUDIO_WAVE);
+        sound.effects.load("bell",  AUDIO_BELL);
+        sound.effects.load("start", AUDIO_START);
+        sound.effects.load("trampoline", AUDIO_JUMP);
+        sound.effects.load("hurryx1", AUDIO_HURRY1);
+        sound.effects.load("hurryx2", AUDIO_HURRY2);
 
-    sound.effects.play("start");
-    state = "START_DELAY";
-    timer.reset(timeout);
-    timeout = timer.start(1000);
+        sound.effects.play("start");
+        this->PAUSED = true;
 
-    this->PAUSED = true;
+        if(!isBonusRound(level)){
+            player.reset(580, 480);
+            goro.reset(770, 160);
+        }
+        else{
+            player.reset(620, 160);
+            goro.reset(32, 450);
+            goro.gravitation = false;
+            goro.state = "bound";
+        }
 
-    if(!isBonusRound(level)){
-        player.reset(580, 480);
-        goro.reset(770, 160);
+        state = "START_DELAY";
+        timer.reset(timeout);
+        timeout = timer.start(1000);
+
+        mode  = PLAY;
+        music = OFF;
+        playBGM();
+        controls.lock = false;
+        start_time = SDL_GetTicks();
     }
-    else{
-        player.reset(620, 160);
-        goro.reset(32, 450);
-        goro.gravitation = false;
-        goro.state = "bound";
-    }
-
-    this->mode  = PLAY;
-    this->music = OFF;
-    this->playBGM();
-    controls.lock = false;
 }
 
 void Game::init(int w, int h){
@@ -431,6 +502,8 @@ void Game::init(int w, int h){
     points = * new Points();
 
     physics = * new Physics();
+
+    player = * new Player();
     player.gravity = physics.gravity(0.125, 0);
     player.gravitation = true;
 
@@ -482,6 +555,10 @@ void Game::init(int w, int h){
     goro.gravity = physics.gravity(0.125, 0);
     goro.active = true;
 
+    gosenzo = * new Gosenzo();
+    gosenzo.init(center.x, 35*BYTE);
+    gosenzo.active = false;
+
     array<array<int, SPRITE_SIZE>,1> badge = {data.items[17]};
     cache.badge = Draw::compile(badge, 1, DIM);
     Draw::clear();
@@ -490,11 +567,13 @@ void Game::init(int w, int h){
     cache.gameover = Draw::compile(go, 2, DIM);
     Draw::clear();
 
-    timeout = timer.start(1500);
+    array<array<int, SPRITE_SIZE>,2> hry = {data.items[28], data.items[29]};
+    cache.hurry = Draw::compile(hry, 2, DIM);
+    hurry = stage.right+DIM*SCALE;
+    Draw::clear();
 
-    // for(int i=0; i<cached.size(); i++){ cout << cached[i] << " "; }
-    // cout<<endl;
-    // cout<< state << endl;
+
+    timeout = timer.start(3000);
 }
 
 int Game::trampoline(){
@@ -507,20 +586,30 @@ int Game::trampoline(){
 }
 
 void Game::pause(){
-    PAUSED = !PAUSED;
-    if(PAUSED){
-        sound.music.pause();
-        sound.effects.pause();
-    }
-    else{
-        sound.music.resume();
-        sound.effects.resume();
+    if(state=="RUNNING" || state=="BONUS_ROUND"){
+        PAUSED = !PAUSED;
+        if(PAUSED){
+            sound.music.pause();
+            sound.effects.pause();
+            pause_time = SDL_GetTicks();
+        }
+        else{
+            sound.music.resume();
+            sound.effects.resume();
+            current_time = SDL_GetTicks();
+            delta += current_time - pause_time;
+        }
     }
 }
 
 void Game::playBGM(){
-    if(state!="BONUS_ROUND"){
-        if(music) sound.music.loop("theme");
+    if(state!="BONUS_ROUND" && music){
+        if(overtime<1){
+            sound.music.loop("theme");
+        }
+        else{
+            sound.music.loop("fast");
+        }
     }
     else{
         if(music) sound.music.play("bonus");
@@ -675,17 +764,25 @@ void Game::interlude(){
         }
     }
     else{
-        clear();
-        state = "CLEAR_SCREEN";
-        timer.reset(timeout);
-        timeout = timer.start(500);
-        restage();
+        if(state!="CLEAR_SCREEN"){
+            clear();
+            state = "CLEAR_SCREEN";
+            text.center("round " + to_string(round*16 + level + 1), 2, 18);
+            timer.reset(timeout);
+            timeout = timer.start(500);
+        }
+        else if(state=="CLEAR_SCREEN" && timer.done(timeout)){
+            timer.reset(timeout);
+            timeout = timer.start(500);
+            restage();
+        }
     }
 }
 
 void Game::restage(){
+    int enemy_count;
+
     if(state=="CLEAR_SCREEN"){
-        this->level    += 1;
         this->offset.x  = -182;
         this->offset.y  = 0;
         this->scrolling = true;
@@ -693,6 +790,12 @@ void Game::restage(){
         this->factor    = 2;
         this->perfect   = false;
         this->bonus     = false;
+        this->overtime  = 0;
+        this->delta = 0;
+
+        if(level==16)
+            round += 1;
+        level = level==16 ? 1 : level + 1;
 
         if(!isBonusRound(level)){
             state="RUNNING";
@@ -730,7 +833,9 @@ void Game::restage(){
             enemies[i].deactivate();
         }
 
-        for(int i=0; i<data.enemies[level-1]; i++){
+        enemy_count = round<1 ? data.enemies[level-1] : 7;
+
+        for(int i=0; i<enemy_count; i++){
             enemies[i].reset(data.spawn[i][0], data.spawn[i][1]);
         }
 
@@ -744,10 +849,12 @@ void Game::restage(){
             goro.reset(32, 450);
             goro.gravitation = false;
             goro.state = "bound";
+            gosenzo.reset();
         }
         else{
             player.reset(580, 480);
             goro.reset(770, 160);
+            gosenzo.reset();
         }
 
         controls.lock = false;
@@ -761,6 +868,8 @@ void Game::restage(){
 
         this->mode = PLAY;
         this->music = ON;
+        this->time = 0;
+        this->start_time = SDL_GetTicks();
     }
     else{
         restage();
@@ -769,6 +878,10 @@ void Game::restage(){
 
 void Game::restart(){
     clear();
+    PAUSED = true;
+    overtime = 0;
+    time = 0;
+
     sound.effects.stop();
     player.reset(580, 480);
 
@@ -782,7 +895,9 @@ void Game::restart(){
         enemies[i].deactivate();
     }
 
-    for(int i=0; i<data.enemies[level-1]; i++){
+    int enemy_count = round<1 ? data.enemies[level-1] : 7;
+
+    for(int i=0; i<enemy_count; i++){
         enemies[i].reset(data.spawn[i][0], data.spawn[i][1]);
     }
 
@@ -793,6 +908,7 @@ void Game::restart(){
     points.reset();
 
     goro.reset(770, 160);
+    gosenzo.reset();
 
     controls.lock = false;
 
@@ -806,12 +922,20 @@ void Game::restart(){
 
     this->mode  = PLAY;
     this->music = ON;
+    this->delta = 0;
+    this->start_time = SDL_GetTicks();
 }
 
 void Game::reset(){
+    timeout = 0;
     level = 0;
+    round = 0;
+    overtime = 0;
+    time = 0;
+    delta = 0;
     state = "CLEAR_SCREEN";
     collected.clear();
+    sound.effects.stop();
     clear();
     stopBGM();
     restage();
@@ -824,4 +948,6 @@ void Game::reset(){
     demo.start();
     state = "START_SCREEN";
     GAME_OVER = false;
+
+    EM_ASM( ResetButton() );
 }

@@ -17,7 +17,6 @@ void Text::init(vector<int> c, int w, int h){
 }
 
 void Text::compile(){
-    // array<char, 42> keys = {"0","1","2","3","4","5","6","7","8","9","a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","!","?",".","/","(c)","@"};
     array<char, 48> keys = {'0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','!','?','.','/','%','@','*','='};
 
     for(int c=0; c<colors.size(); c++){
@@ -28,13 +27,9 @@ void Text::compile(){
             SDL_SetRenderTarget(renderer, texture);
 
             draw(data.alpha[i], colors[c]);
-
-            // cache[c][i] = texture;
             characters.insert(make_pair(keys[i], texture));
-            // SDL_SetRenderTarget(renderer, NULL);
         }
         alpha.insert(make_pair(colors[c], characters));
-        // alpha.insert({colors[c], characters});
     }
 
     SDL_SetRenderTarget(renderer, NULL);
@@ -77,7 +72,7 @@ void Text::render(string text, int color, Coordinates offset){
     SDL_Rect dest, src;
     dest.x = offset.x;
     dest.y = offset.y;
-    dest.w = unit; //text.size()*unit + (text.size()-1)*kern;
+    dest.w = unit;
     dest.h = unit;
 
     src.x = 0;
@@ -88,8 +83,6 @@ void Text::render(string text, int color, Coordinates offset){
     if(visible){
         for(int i=0; i<text.size(); i++){
             dest.x = offset.x + (unit + kern)*i;
-            // cout << text[i];
-            // map<char, SDL_Texture*> chars = alpha[color];
             if(text[i]!=' '){
                 SDL_RenderCopy(renderer, alpha[color][text[i]], &src, &dest);
             }
@@ -97,9 +90,7 @@ void Text::render(string text, int color, Coordinates offset){
                 dest.x += unit;
             }
         }
-        // for(char& c: text){ dest.x += BYTE*SCALE + kern; SDL_RenderCopy(renderer, alpha[color][c], &src, &dest); }
     }
-    // cout << endl;
 }
 
 void Text::render(string text, int color, int col, int row){
@@ -142,7 +133,3 @@ void Text::hiscore(){
     }
     render(s, RED, 15, 1);
 }
-
-// void Text::animate(){
-
-// }

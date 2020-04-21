@@ -4,26 +4,48 @@
 		<meta charset="utf-8">
     	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     	<title>Mappy</title>
-    	<link href="index.css" rel="stylesheet" type="text/css">
-    	<!--
-    	<script type="text/javascript" src="js/svg.min.js"></script>
-    	<script type="text/javascript" src="js/bitmap.js"></script>
-    	<script type="text/javascript" src="js/game.js"></script>
-    	<script type="text/javascript" src="js/sprite.js"></script>
-    	<script type="text/javascript" src="js/main.js"></script>
-    	-->
+    	<link href="styles/index.css" rel="stylesheet" type="text/css">
+        <!--
+        <link rel="apple-touch-icon" sizes="57x57" href="favicons/apple-icon-57x57.png">
+        <link rel="apple-touch-icon" sizes="60x60" href="favicons/apple-icon-60x60.png">
+        <link rel="apple-touch-icon" sizes="72x72" href="favicons/apple-icon-72x72.png">
+        <link rel="apple-touch-icon" sizes="76x76" href="favicons/apple-icon-76x76.png">
+        <link rel="apple-touch-icon" sizes="114x114" href="favicons/apple-icon-114x114.png">
+        <link rel="apple-touch-icon" sizes="120x120" href="favicons/apple-icon-120x120.png">
+        <link rel="apple-touch-icon" sizes="144x144" href="favicons/apple-icon-144x144.png">
+        <link rel="apple-touch-icon" sizes="152x152" href="favicons/apple-icon-152x152.png">
+        <link rel="apple-touch-icon" sizes="180x180" href="favicons/apple-icon-180x180.png">
+        <link rel="icon" type="image/png" sizes="192x192"  href="favicons/android-icon-192x192.png">
+        -->
+        <link rel="icon" type="image/png" sizes="32x32" href="favicons/favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="96x96" href="favicons/favicon-96x96.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="favicons/favicon-16x16.png">
+        <meta name="msapplication-TileColor" content="#ffffff">
+        <meta name="msapplication-TileImage" content="/ms-icon-144x144.png">
+        <meta name="theme-color" content="#ffffff">
   	</head>
   	<body>
     	<div id="screen">
         	<canvas id="canvas" width="800" height="600" oncontextmenu="event.preventDefault()"></canvas>
-			<!--
+
 			<div class="lds-spinner" id="loader">
         		<div></div><div></div><div></div><div></div><div></div><div></div>
         		<div></div><div></div><div></div><div></div><div></div><div></div>
         	</div>
-        	-->
-			<div class="lds-ellipsis" id="loader"><div></div><div></div><div></div><div></div></div>
+
+			<!-- <div class="lds-ellipsis" id="loader"><div></div><div></div><div></div><div></div></div> -->
 			<!-- <div class="lds-ripple" id="loader"><div></div><div></div></div> -->
+    	</div>
+    	<div id="toolbar">
+    		<img src="images/mappy.svg" id="mappy"/>
+
+    		<div class="panel" id="message">Loading...</div>
+			<div class="speech-wrapper sm">
+        		<div class="speech"></div>
+    		</div>
+    		<button id="start" class="btn btn-gray">
+    			<span class="glyphicon glyphicon-play" aria-hidden="true" id="icon"></span>Start
+    		</button>
     	</div>
    		<!-- <textarea class="em_textarea" id="output" rows="8"></textarea> -->
     	<script type='text/javascript'>
@@ -31,20 +53,84 @@
 	    var img = null;
 	    var canvas = null;
 	    var ctx = null;
+	    var start = null;
+	    var state = "loading";
+	    var game_state = "";
 	    var spinner;
 
-	    function ModuleLoading(){
-			canvas = document.getElementById('canvas');
-			ctx = canvas.getContext("2d");
-			ctx.fillStyle = '#0078F8';
-			ctx.fillRect(0, 0, canvas.width, canvas.height);
-	    }
+	    function InitWrappers() {
+	        var start = Module.cwrap('startButton', 'Boolean');
+	        // var getState = Module.cwrap('getState', 'String');
+			/*document.getElementById("string_button").onclick = function() {
+	            if( string_test != null ) {
+	                string_test(document.getElementById('string_input').value);
+	            }
+	        }*/
+	        document.getElementById("start").onclick = function() {
+	            if( start!=null ){
+	                var success = start();
+	                if(state=="running" && success){
+	                	state="paused";
+	                	this.childNodes[1].nodeValue = "Play";
+	                	document.getElementById("icon").className ="glyphicon glyphicon-play";
+	                }
+	                else if(state=="paused" || state=="start"){
+	                	if(success){
+	                		state="running";
+	                		this.childNodes[1].nodeValue = "Pause";
+	                		document.getElementById("icon").className ="glyphicon glyphicon-pause";
+	                	}
+	                }
+	                else if(state=="gameover"){
+	                	state=="start";
+	                	this.textContent = "Reset";
+	                }
+	            }
+	        }
+    	}
+
+    	function GetState(s){
+    		game_state = s;
+    		console.log(game_state);
+    	}
+
+    	function GameOver(){
+    		state="running";
+	        document.getElementById("start").childNodes[1].nodeValue = "Reset";
+	        document.getElementById("icon").className ="glyphicon glyphicon-repeat";
+	        console.log("game over");
+    	}
+
+    	function ResetButton(){
+    		state="start";
+    		document.getElementById("start").childNodes[1].nodeValue = "Start";
+    		document.getElementById("icon").className ="glyphicon glyphicon-play";
+    	}
+
+    	var keyinput = function(e){
+    		if(e.keyCode==32){
+    			if(state=="running"){
+    				state="paused";
+    				document.getElementById("start").childNodes[1].nodeValue = "Play";
+    				document.getElementById("icon").className ="glyphicon glyphicon-play";
+    			}
+    			else if(state=="paused" || state=="start"){
+    				state="running";
+	                document.getElementById("start").childNodes[1].nodeValue = "Pause";
+	                document.getElementById("icon").className ="glyphicon glyphicon-pause";
+    			}
+    		}
+    	}
 
 	    function ModuleLoaded() {
 	    	canvas = document.getElementById('canvas');
 	    	ctx = canvas.getContext("2d");
 	    	spinner = document.getElementById('loader');
 	    	spinner.remove();
+	    	state = "start";
+	    	document.getElementById("start").style.display = "block";
+	    	document.addEventListener('keypress', keyinput);
+	    	document.getElementById("message").innerHTML = "controls: ← → left + right, ↑ door";
 	    }
 
 	    var Module = {
@@ -132,6 +218,7 @@
 	            document.removeEventListener('keydown', resumeAudio);
 	        }
 	    }
+
 	    document.getElementById('canvas').addEventListener('click', resumeAudio);
 	    document.addEventListener('keydown', resumeAudio);
     </script>

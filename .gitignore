@@ -4,5 +4,6 @@
 README.html
 *.zip
 audio/*
+favicons/*
 snippets.cpp
 cut.cpp

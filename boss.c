@@ -76,11 +76,11 @@ void Boss::update(){
         }
         else if(captured){
             if(state == "right"){
-                x -= SPEED;
+                x -= WAVE_SPEED;
                 collider->passthru = true;
             }
             else if(state == "left"){
-                x += SPEED;
+                x += WAVE_SPEED;
                 collider->passthru = true;
             }
         }
@@ -342,6 +342,8 @@ void Boss::reset(double x, double y){
     this->frame       = 0;
     this->animated    = true;
     this->active      = true;
+    this->released    = false;
+    this->captured    = false;
     this->bounces     = -1;
     this->collider->passthru = false;
     this->collider->update(x+game.offset.x, y+game.offset.y);

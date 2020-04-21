@@ -4,7 +4,7 @@
 // #include <cstdlib>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_mixer.h>
-// #include <SDL.h>
+
 #include <emscripten.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -31,6 +31,7 @@ using namespace std;
 #define SPEED 1.5
 #define ENEMY_SPEED 1
 #define BOSS_SPEED 1.25
+#define WAVE_SPEED 2
 #define BYTE 8
 #define WORD 16
 #define LONG 32
@@ -49,7 +50,7 @@ using namespace std;
 #define DOOR_SIZE 576
 #define BITMAP_SIZE 64
 #define TILE_SIZE 64
-#define ITEMS_SIZE 28
+#define ITEMS_SIZE 30
 #define LEVEL_WIDTH 56
 #define LEVEL_HEIGHT 36
 #define LEVEL_SIZE LEVEL_WIDTH*LEVEL_HEIGHT //2016
@@ -57,6 +58,8 @@ using namespace std;
 #define GROUND_FLOOR 480
 #define FLOORS 6
 #define FLOOR_HEIGHT ((LEVEL_HEIGHT-10)/FLOORS)
+#define OVERTIME 80000
+#define TIME_LIMIT 100000
 
 #define EMPTY 0
 #define SOLID 1
@@ -82,18 +85,21 @@ using namespace std;
 #define ORANGE 37
 #define PINK 21
 
-#define AUDIO_THEME (char*)"/audio/theme.wav"
-#define AUDIO_BONUS (char*)"/audio/bonus.wav"
-#define AUDIO_START (char*)"/audio/start.wav"
-#define AUDIO_FANFARE (char*)"/audio/fanfare.wav"
-#define AUDIO_RESULTS (char*)"/audio/results.wav"
-#define AUDIO_DEAD (char*)"/audio/dead.wav"
-#define AUDIO_CLEAR (char*)"/audio/clear.wav"
-#define AUDIO_ITEM (char*)"/audio/item.wav"
-#define AUDIO_WAVE (char*)"/audio/wave.wav"
-#define AUDIO_BELL (char*)"/audio/bell.wav"
-#define AUDIO_JUMP (char*)"/audio/trampoline.wav"
-#define AUDIO_GAME_OVER (char*)"/audio/gameover.wav"
+#define AUDIO_THEME (char*)"/audio/theme.ogg"
+#define AUDIO_BONUS (char*)"/audio/bonus.ogg"
+#define AUDIO_FAST (char*)"/audio/fast.ogg"
+#define AUDIO_START (char*)"/audio/start.ogg"
+#define AUDIO_FANFARE (char*)"/audio/fanfare.ogg"
+#define AUDIO_RESULTS (char*)"/audio/results.ogg"
+#define AUDIO_DEAD (char*)"/audio/dead.ogg"
+#define AUDIO_CLEAR (char*)"/audio/clear.ogg"
+#define AUDIO_ITEM (char*)"/audio/item.ogg"
+#define AUDIO_WAVE (char*)"/audio/wave.ogg"
+#define AUDIO_BELL (char*)"/audio/bell.ogg"
+#define AUDIO_JUMP (char*)"/audio/trampoline.ogg"
+#define AUDIO_GAME_OVER (char*)"/audio/gameover.ogg"
+#define AUDIO_HURRY1 (char*)"/audio/hurryx1.ogg"
+#define AUDIO_HURRY2 (char*)"/audio/hurryx2.ogg"
 
 
 class Stage;
@@ -178,6 +184,10 @@ class Stage{
 
 class Sound{
     public:
+        int flags;
+        int rate;
+        int buffers;
+        Uint16 format;
         Sound();
         void init();
 
@@ -309,52 +319,6 @@ class Gravity{
         bool fallthru(T* sprite);
 };
 
-class Sprite{
-    public:
-        double x;
-        double y;
-
-        int width;
-        int height;
-        int frame;
-        int cycle;
-        int repeat;
-
-        bool gravitation;
-        bool falling;
-        bool bouncing;
-        bool dead;
-
-        string direction;
-        string state;
-        string type;
-
-        map< string, array<array<int, SPRITE_SIZE>, FRAMES> > states;
-        //Collider *collider;
-
-        // Sprite();
-        // Sprite(const Sprite &S);
-        // virtual ~Sprite();
-        // virtual void animate() = 0;
-        virtual void init(double x, double y) = 0;
-        virtual void update() = 0;
-        virtual void move() = 0;
-        virtual void render() = 0;
-        virtual void draw(const array<array<int, SPRITE_SIZE>, FRAMES> &data) = 0;
-        virtual void define(string name, array<array<int, SPRITE_SIZE>, FRAMES> frames) = 0;
-        virtual int  index(double x, double y) = 0;
-        virtual int  adjacent(int direction) = 0;
-        virtual int  adjacent(int direction, double x, double y) = 0;
-        virtual bool traverse(int direction) = 0;
-        virtual bool traverse(int direction, double x, double y) = 0;
-        virtual void align()  = 0;
-        virtual void deaded() = 0;
-        virtual void bounce() = 0;
-        virtual void ledge()  = 0;
-        virtual array<array<int, SPRITE_SIZE>, FRAMES>
-            flip(array<array<int, SPRITE_SIZE>, FRAMES> frames) = 0;
-};
-
 class GameObject{
     public:
         string state;
@@ -387,6 +351,7 @@ class GameObject{
 class Trampoline: public GameObject{
     public:
         int bounces;
+        bool targeted;
         string jumper;
 
         vector< Coordinates > layout;
@@ -555,6 +520,55 @@ class Points: public GameObject{
         void reset();
 };
 
+class Sprite{
+    public:
+        double x;
+        double y;
+
+        int width;
+        int height;
+        int frame;
+        int cycle;
+        int repeat;
+
+        bool gravitation;
+        bool falling;
+        bool bouncing;
+        bool dead;
+        bool animated;
+
+        string direction;
+        string state;
+        string type;
+
+        map< string, array<array<int, SPRITE_SIZE>, FRAMES> > states;
+        //Collider *collider;
+
+        // Sprite();
+        // Sprite(const Sprite &S);
+        // virtual ~Sprite();
+        // virtual void animate() = 0;
+        virtual void init(double x, double y) = 0;
+        virtual void update() = 0;
+        virtual void move() = 0;
+        virtual void render() = 0;
+        virtual void compile() = 0;
+        // virtual void draw(const array<array<int, SPRITE_SIZE>, FRAMES> &data) = 0;
+        virtual void draw(const array<int, SPRITE_SIZE> &bits) = 0;
+        virtual void define(string name, array<array<int, SPRITE_SIZE>, FRAMES> frames) = 0;
+        virtual int  index(double x, double y) = 0;
+        virtual int  adjacent(int direction) = 0;
+        virtual int  adjacent(int direction, double x, double y) = 0;
+        virtual bool traverse(int direction) = 0;
+        virtual bool traverse(int direction, double x, double y) = 0;
+        virtual void align()  = 0;
+        virtual void deaded() = 0;
+        virtual void bounce() = 0;
+        virtual void ledge()  = 0;
+        virtual array<array<int, SPRITE_SIZE>, FRAMES>
+            flip(array<array<int, SPRITE_SIZE>, FRAMES> frames) = 0;
+};
+
 class Player: public Sprite{
     public:
         double x;
@@ -565,6 +579,7 @@ class Player: public Sprite{
         int cycle;
         int repeat;
         int bounces;
+        bool animated;
         bool gravitation;
         bool falling;
         bool bouncing;
@@ -574,6 +589,7 @@ class Player: public Sprite{
         string state;
         string type;
         map< string, array<array<int, SPRITE_SIZE>, FRAMES> > states;
+        map<string, array<SDL_Texture*, FRAMES> >* cache;
 
         Collider<Player> *collider;
         Gravity *gravity;
@@ -584,6 +600,7 @@ class Player: public Sprite{
         virtual void move();
         virtual void update();
         virtual void render();
+        virtual void compile();
         virtual void define(string name, array<array<int, SPRITE_SIZE>, FRAMES> frames);
         virtual int  index();
         virtual int  index(double x, double y);
@@ -599,7 +616,8 @@ class Player: public Sprite{
         virtual void bounce();
         virtual void ledge();
 
-        void draw(const array<array<int, SPRITE_SIZE>, FRAMES> &data);
+        // void draw(const array<array<int, SPRITE_SIZE>, FRAMES> &data);
+        void draw(const array<int, SPRITE_SIZE> &bits);
         // template <class T>
         // bool collision(Collider<T> complement);
         void collision();
@@ -624,7 +642,7 @@ class Enemy: public Sprite{
         bool gravitation;
         bool falling;
         bool bouncing;
-        bool ko;
+        // bool ko;
         bool animated;
         bool captured;
         bool released;
@@ -713,6 +731,27 @@ class Boss: public Enemy{
         void reward();
         int  behind();
         void balloons();
+};
+
+class Gosenzo: public Enemy{
+    public:
+        map< string, array<array<int, SPRITE_SIZE>, FRAMES> > states;
+        map<string, array<SDL_Texture*, FRAMES> >* cache;
+
+        Collider<Gosenzo> *collider;
+
+        virtual void define(string name, array<array<int, SPRITE_SIZE>, FRAMES> frames);
+
+        Gosenzo();
+        void compile();
+        void render();
+        void draw(const array<int, SPRITE_SIZE> &bits);
+        void update();
+        void walk();
+        void fork();
+        void decision();
+        void move();
+        void reset();
 };
 
 class Physics{
@@ -809,9 +848,20 @@ class Game{
         int  factor;
         int  lives;
         int  timeout;
+        int  overtime;
+        int  round;
+        double hurry;
+        Uint32 limit;
         Uint32 score;
         Uint32 lifeup;
         Uint32 timestamp;
+        Uint32 start_time;
+        Uint32 current_time;
+        Uint32 last_time;
+        Uint32 pause_time;
+        Uint32 ms_per_frame;
+        Uint32 delta;
+        Uint32 time;
 
         struct Center{
             double x;
@@ -849,8 +899,10 @@ class Game{
         vector<string> cached;
 
         struct Cache{
+            map<string, array<SDL_Texture*, FRAMES> > player;
             map<string, array<SDL_Texture*, FRAMES> > enemy;
             map<string, array<SDL_Texture*, FRAMES> > boss;
+            map<string, array<SDL_Texture*, FRAMES> > gosenzo;
             map<string, array<SDL_Texture*, FRAMES> > trampoline;
             map<string, array<SDL_Texture*, FRAMES> > wave;
             map<string, map<string, vector<SDL_Texture*> > > door;
@@ -864,6 +916,7 @@ class Game{
             SDL_Texture* badge;
             SDL_Texture* reward;
             SDL_Texture* gameover;
+            SDL_Texture* hurry;
         } cache;
 
         Game();
@@ -889,6 +942,10 @@ class Game{
         void results();
         void interlude();
         void gameover();
+        void speedup();
+        void overlimit();
+        void clock();
+        void warning();
         bool isBonusRound(int lvl);
 };
 
@@ -925,11 +982,8 @@ extern Game    game;
 extern Physics physics;
 extern Player  player;
 extern Boss    goro;
+extern Gosenzo gosenzo;
 extern struct  Data data;
-
-extern Uint32 last_time;
-extern Uint32 current_time;
-extern Uint32 ms_per_frame;
 
 extern SDL_Window   *window;
 extern SDL_Renderer *renderer;

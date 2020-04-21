@@ -8,6 +8,7 @@ Player::Player() : Sprite(){
     this->gravitation = true;
     this->falling  = false;
     this->bouncing = false;
+    this->animated = true;
     this->direction = "left";
     this->state = "left";
     this->type = "player";
@@ -18,6 +19,28 @@ Player::Player() : Sprite(){
     this->bounces = 0;
     this->timestamp = SDL_GetTicks();
     this->collider = new Collider<Player>(this);
+    this->cache = &game.cache.player;
+
+    array <array<int, SPRITE_SIZE>, BITMAP_SIZE> b = data.sprites;
+    array<array<int, SPRITE_SIZE>, FRAMES>
+    f0 = {b[0], b[1], b[0], b[1], b[0], b[1], b[0], b[1]}, // left, right
+    f1 = {b[2], b[2], b[3], b[3], b[2], b[2], b[3], b[3]}, // drop
+    f2 = {b[4], b[4], b[4], b[4], b[4], b[4], b[4], b[4]}, // bound
+    f3 = {b[5], b[5], b[5], b[5], b[5], b[5], b[5], b[5]}, // hop
+    f5 = {b[7], b[8], b[9], b[10], b[11], b[12], b[13], b[14]}, // spin
+    f6 = {b[15], b[15], b[16], b[16], b[15], b[15], b[16], b[16]}; // dead
+
+    define("left", f0);
+    define("right", flip(f0));
+    define("drop", f1);
+    define("bound", f1);
+    define("turn", f2);
+    define("hop-left", f3);
+    define("hop-right", flip(f3));
+    define("spin", f5);
+    define("dead", f6);
+
+    compile();
 };
 
 void Player::init(double x, double y){
@@ -41,6 +64,28 @@ void Player::reset(double x, double y){
     this->collider->passthru = true;
     this->x = x;
     this->y = y;
+}
+
+void Player::compile(){
+    // if(!contains(game.cached, type)){
+        for(map< string, array< array<int, SPRITE_SIZE>, FRAMES> >::iterator it=states.begin(); it!=states.end(); ++it){
+            string s = it->first;
+            array<SDL_Texture*, FRAMES> images;
+
+            for(int f=0; f<FRAMES; f++){
+                SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width*SCALE, height*SCALE);
+                SDL_SetRenderTarget(renderer, texture);
+                SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+
+                draw(it->second[f]);
+
+                images[f] = texture;
+            }
+            cache->insert(make_pair(s, images));
+        }
+        SDL_SetRenderTarget(renderer, NULL);
+        game.cached.push_back(type);
+    // }
 }
 
 void Player::move(){
@@ -114,13 +159,6 @@ bool Player::traverse(int direction){
     if(tile>=RADIO && tile<=BONUS_BALLOON){
         return true;
     }
-    // if(tile==BALLOON){
-    //     return true;
-    // }
-
-    // if(tile==BONUS_BALLOON){
-    //     return true;
-    // }
 
     if(tile>=DOOR_LEFT && tile<=MAGIC_DOOR_R){
         switch(direction){
@@ -162,12 +200,6 @@ bool Player::traverse(int direction, double x, double y){
     if(tile>=RADIO && tile<=BONUS_BALLOON){
         return true;
     }
-    // if(tile==BALLOON){
-    //     return true;
-    // }
-    // if(tile==BONUS_BALLOON){
-    //     return true;
-    // }
 
     if(tile>=DOOR_LEFT && tile<=MAGIC_DOOR_R){
         switch(direction){
@@ -296,33 +328,29 @@ void Player::align(bool horiz){
     // }
 }
 
-
-void Player::draw(const array<array<int, SPRITE_SIZE>, FRAMES> &bits){
+void Player::draw(const array<int, SPRITE_SIZE> &bits){
     string color;
     SDL_Rect r;
+    int row, col, bit,
+    w = SCALE,
+    alpha = 255;
 
-    int w = SCALE;
-    int row;
-    int col;
-    int bit;
-    int alpha;
-
-    for(int i=0; i < bits[0].size(); i++) {
-        bit = bits[frame][i];
+    for(int i=0; i<SPRITE_SIZE; i++) {
+        bit = bits[i];
         if(bit){
-            alpha = data.palette[bit]=="NULL" ? 0 : 255;
-            color = data.palette[bit]=="NULL" ? "#000000" : data.palette[bit];
+            color = data.palette[bit];
             SDL_Color c = hex2sdl(color);
 
             col = i % DIM;
             row = floor(i / DIM);
 
-            r.x = this->x + w*col;
-            r.y = this->y + w*row;
+            r.x = w*col;
+            r.y = w*row;
             r.w = w;
             r.h = w;
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
             SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, alpha);
-            SDL_RenderFillRect(renderer, &r );
+            SDL_RenderFillRect(renderer, &r);
         }
     }
 }
@@ -400,8 +428,8 @@ void Player::update(){
         }
         game.restart();
     }
-
-    if(game.scrolling && (game.offset.x>=OFFSET || game.offset.x<=-OFFSET*2)){
+    // if(game.scrolling && (game.offset.x>=OFFSET || game.offset.x<=-OFFSET*2)){
+    if(game.scrolling && (game.offset.x>OFFSET || game.offset.x<OFFSET*-2)){
         game.scrolling = false;
     }
     else if(x>game.center.x-OFFSET && x+width<game.center.x+OFFSET){
@@ -446,6 +474,18 @@ void Player::collect(){
 }
 
 void Player::render(){
+    SDL_Rect dest, src;
+    dest.x = x;
+    dest.y = y;
+
+    dest.w = width*SCALE;
+    dest.h = height*SCALE;
+
+    src.x = 0;
+    src.y = 0;
+    src.w = width*SCALE;
+    src.h = height*SCALE;
+
     if(game.controls.key_down ||
        state=="spin" || state=="dead" || state=="drop" || state=="bound"){
         if( frame >= FRAME_COUNT ) {
@@ -464,19 +504,23 @@ void Player::render(){
             frame++;
         }
     }
-    this->draw(this->states[this->state]);
+
+    SDL_SetTextureBlendMode((*cache)[state][frame], SDL_BLENDMODE_BLEND);
+    SDL_RenderCopy(renderer, (*cache)[state][frame], &src, &dest);
 }
 
 void Player::deaded(){
     if(!dead){
+        dead = true;
+
+        game.stopBGM();
+        game.sound.effects.stop();
+
         state = "spin";
         bouncing = false;
         falling  = false;
-        dead = true;
         game.controls.lock = true;
         timestamp = SDL_GetTicks();
-        game.sound.effects.stop();
-        game.stopBGM();
 
         if(game.state!="BONUS_ROUND"){
             game.sound.effects.play("dead");
@@ -500,7 +544,7 @@ void Player::collision(){
             deaded();
         }
 
-        if(collider->check(goro.collider)){
+        if(gosenzo.active && collider->check(gosenzo.collider)){
             deaded();
         }
 
@@ -513,9 +557,12 @@ void Player::collision(){
 }
 
 void Player::bounce(){
-    if(bounces<=BOUNCES){
+    if(!bouncing && bounces<=BOUNCES){
         bounces++;
     }
+
+    falling = false;
+    bouncing = true;
 }
 
 void Player::door(){

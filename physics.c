@@ -28,7 +28,7 @@ Gravity::Gravity(float factor,  int delay){
 
 template <class T>
 bool Gravity::fallthru(T* sprite){
-    int index = sprite->index(sprite->x, sprite->y)+LEVEL_WIDTH;
+    int index = sprite->index()+LEVEL_WIDTH;
 
     for(int t=0; t<game.trampolines.size(); t++){
         vector<int> group = game.trampolines[t].group;
@@ -80,6 +80,9 @@ void Gravity::update(T* sprite){
             if(!sprite->bouncing){
                 sprite->align();
 
+                if(game.state!="BONUS_ROUND" && sprite->type=="player")
+                    sprite->bounces = 0;
+
                 if(sprite->type=="player" && game.state!="BONUS_ROUND"){
                     for(int t=0; t<game.trampolines.size(); t++){
                         game.trampolines[t].clear();
@@ -105,6 +108,8 @@ void Gravity::update(T* sprite){
                     game.trampolines[t].jumper = sprite->type;
 
                     if(game.trampolines[t].bounces<BOUNCES && !game.trampolines[t].active){
+                        if(sprite->type=="player")
+                            game.trampolines[t].targeted = true;
                         bound(sprite, game.trampolines[t]);
                     }
                     else if(game.trampolines[t].active){
@@ -168,10 +173,6 @@ template <class T>
 void Gravity::bound(T* sprite, Trampoline trampoline){
     trampoline.active = true;
     sprite->trampoline = trampoline;
-
-    sprite->falling = false;
-    sprite->bouncing = true;
-
     // sprite->align(true);
     sprite->bounce();
 
@@ -222,7 +223,7 @@ void Collider<T>::debug(){
 template <class T>
 template <class T2>
 bool Collider<T>::check(Collider<T2>* collider){
-    if(this->passthru || (collider->passthru && object->type!="wave" && object->type!="bell")){
+    if((this->passthru || (collider->passthru && object->type!="wave" && object->type!="bell")) && collider->object->type!="gosenzo"){
         return false;
     }
 

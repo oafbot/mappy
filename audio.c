@@ -1,15 +1,30 @@
 #include "game.hpp"
 
 Sound::Sound(){
+    rate = 44100;
+    buffers = 1024;
+    format = MIX_DEFAULT_FORMAT;
 
-    // music = Music();
+    // rate = 22050;
+    // buffers = 1024;
+    // format = AUDIO_S16SYS;
+    // flags = MIX_INIT_MP3;
 }
 
 void Sound::init(){
-    if( Mix_OpenAudio( 44100, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 1024 ) < 0 ){
+    int result = 0;
+
+    if( Mix_OpenAudio( rate, format, MIX_DEFAULT_CHANNELS, buffers ) < 0 ){
         printf( "SDL_mixer could not initialize! SDL_mixer Error: %s\n", Mix_GetError() );
         exit(2);
     }
+
+    // if (flags != (result = Mix_Init(flags))) {
+    //     printf("Could not initialize mixer (result: %d).\n", result);
+    //     printf("Mix_Init: %s\n", Mix_GetError());
+    //     exit(1);
+    // }
+
     Mix_AllocateChannels(16);
 }
 

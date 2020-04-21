@@ -131,6 +131,7 @@ Trampoline::Trampoline(){
     this->bounces = 0;
     this->active = false;
     this->jumper = "";
+    this->targeted = false;
     this->cache = &game.cache.trampoline;
 
     array<array<int, TILE_SIZE>, BITMAP_SIZE> d = data.trampoline;
@@ -225,7 +226,7 @@ void Trampoline::render(){
             }
         }
         else{
-            if(frame==5){
+            if(frame==0){
                 bounce();
             }
             frame++;
@@ -352,9 +353,10 @@ void Trampoline::reset(){
 }
 
 void Trampoline::bounce(){
-    if(jumper=="player" && bounces<=BOUNCES){
+    if(jumper=="player" && targeted && bounces<=BOUNCES){
         bounces++;
     }
+    // if(targeted){ bounces = player.bounces; }
     active = false;
 }
 
@@ -364,6 +366,7 @@ void Trampoline::clear(){
         bounces = 0;
         state   = "green";
         active  = false;
+        targeted = false;
         jumper  = "";
     }
 }
@@ -417,8 +420,6 @@ void Item::assign(int index){
 }
 
 void Item::compile(){
-    // if(!contains(game.cached, type)){
-    // cout<<type<<endl;
     SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width*SCALE, height*SCALE);
     SDL_SetRenderTarget(renderer, texture);
 
@@ -426,8 +427,6 @@ void Item::compile(){
 
     cache = texture;
     SDL_SetRenderTarget(renderer, NULL);
-        // game.cached.push_back(type);
-    // }
 }
 
 void Item::render(){
@@ -910,7 +909,7 @@ void Wave::update(){
 
     if(active){
         if((direction==LEFT && x>0) || (direction==RIGHT && x<game.stage.right+64)){
-            x = direction==LEFT ? x - SPEED : x + SPEED;
+            x = direction==LEFT ? x - WAVE_SPEED : x + WAVE_SPEED;
 
             if(collider->check(goro.collider)){
                 found = false;

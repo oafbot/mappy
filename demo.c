@@ -2,7 +2,7 @@ Demo::Demo(){
     array<array<int, TILE_SIZE>, 9> bits;
     title = * new Title();
     title.compile();
-    lines = { "namcopy presents", "% 2020 namcopy", "starring" };
+    lines = { "namcopy presents", "% 2020 namcopy", "all rights undeserved", "starring" };
     bits = {data.tiles[129],data.tiles[130],data.tiles[131],data.tiles[132],data.tiles[133],data.tiles[134],data.tiles[135],data.tiles[136],data.tiles[137]};
     logo = Draw::compile(bits, 9, 8);
     Draw::clear();
@@ -41,6 +41,7 @@ void Demo::start(){
     int size;
     game.text.center(lines[0], WHITE, 2);
     game.text.center(lines[1], WHITE, 30);
+    game.text.center(lines[2], WHITE, 35);
 
     title.display();
 
@@ -53,11 +54,15 @@ void Demo::start(){
     position.push_back(c1);
 
     size = lines[2].size();
+    Coordinates c3 = {(game.center.x - ((size*game.text.unit + ((size-1)*game.text.kern)) / 2)), (double)35*game.text.unit};
+    position.push_back(c3);
+
+    size = lines[3].size();
     Coordinates c2 = { (double)game.stage.right + game.text.getWidth(lines[0]), (double)2*game.text.unit };
     position.push_back(c2);
 
     logox = game.center.x-64;
-    Draw::render(logo, logox, 33*8*SCALE);
+    Draw::render(logo, logox, 32.5*8*SCALE);
     scene = 0;
 
     game.timer.reset(game.timeout);
@@ -101,16 +106,17 @@ void Demo::cast(){
 void Demo::animate(){
     if(!game.interval()){ return; }
 
-    if(position[2].x > game.center.x-game.text.getWidth(lines[2])/2){
+    if(position[3].x > game.center.x-game.text.getWidth(lines[3])/2){
+        logox -= SCALE;
+        Draw::render(logo, logox, 32.5*8*SCALE);
         scrollLeft(lines[0], 0, SCALE, 2);
         scrollLeft(lines[1], 1, SCALE, 2);
-        scrollLeft(lines[2], 2, SCALE, 42);
-        logox -= SCALE;
-        Draw::render(logo, logox, 33*8*SCALE);
+        scrollLeft(lines[2], 2, SCALE, 2);
+        scrollLeft(lines[3], 3, SCALE, 42);
         title.display();
     }
     else{
-        game.text.center(lines[2], 42, 2);
+        game.text.center(lines[3], 42, 2);
 
         if(scene<1){
             title.display();
